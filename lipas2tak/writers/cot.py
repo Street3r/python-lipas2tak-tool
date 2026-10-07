@@ -67,6 +67,8 @@ def polyline(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
         f"<detail>{links}"
         f"<strokeColor value='{argb}'/><strokeWeight value='{stroke_weight:.1f}'/>"
         "<strokeStyle value='solid'/>"
+        # Läpinäkyvä täyttö: muuten ATAK täyttää umpinaiset (silmukka-)reitit
+        "<fillColor value='0'/>"
         f"<contact callsign={quoteattr(callsign)}/>"
         f"<remarks>{escape(remarks)}</remarks>"
         "<archive/><labels_on value='false'/>"

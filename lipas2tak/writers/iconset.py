@@ -1,8 +1,9 @@
 """ATAK-kuvakesarja (iconset .zip).
 
-Rakenne:
-    iconset.xml
-    <ryhmä>/<kuvake>.png
+Rakenne (ATAK-CIV UserIconSet/UserIcon):
+    iconset.xml         <iconset name uid version [defaultGroup skipResize ...]>
+                          <icon name="kuvake.png" type2525b="a-u-G"/>
+    <ryhmä>/<kuvake>.png  ryhmä = hakemisto zipissä (ei XML:ssä)
 CoT-merkit viittaavat kuvakkeeseen polulla `<iconset-uid>/<ryhmä>/<kuvake>.png`.
 Iconsetin UID on kiinteä, jotta kuvakkeiden vaihto (esim. Metsähallituksen
 luvan jälkeen) ei riko jo jaettuja merkkejä: asennetaan vain uusi zip.
@@ -26,8 +27,9 @@ def write(path: Path, icons_dir: Path, icons: list[str], cot_type: str = "a-u-G"
     entries = "\n".join(f"  <icon name={quoteattr(i)} type2525b={quoteattr(cot_type)}/>" for i in sorted(set(icons)))
     xml = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-        f'<iconset version="1" name="{ICONSET_NAME}" default_group="{ICONSET_GROUP}" '
-        f'uid="{ICONSET_UID}" skip_resize="false">\n{entries}\n</iconset>\n'
+        # Attribuuttinimet ATAKin UserIconSet-luokan mukaan (camelCase)
+        f'<iconset version="1" name="{ICONSET_NAME}" defaultGroup="{ICONSET_GROUP}" '
+        f'uid="{ICONSET_UID}" skipResize="false">\n{entries}\n</iconset>\n'
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")

@@ -30,6 +30,24 @@ ICONS = {
 
 SIZE = 64
 
+# Fontti, jossa on ä/ö (Pillowin oletusfontista ne puuttuvat)
+FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
+    "C:/Windows/Fonts/arialbd.ttf",
+]
+
+
+def _font(size: int):
+    for f in FONT_CANDIDATES:
+        if Path(f).exists():
+            return ImageFont.truetype(f, size)
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:  # vanha Pillow
+        return ImageFont.load_default()
+
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
@@ -37,11 +55,8 @@ def main() -> None:
         img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
         d.rounded_rectangle((2, 2, SIZE - 3, SIZE - 3), radius=12, fill=color, outline="white", width=4)
-        size = 34 if len(text) == 1 else 26
-        try:
-            font = ImageFont.load_default(size=size)
-        except TypeError:  # vanha Pillow
-            font = ImageFont.load_default()
+        size = 34 if len(text) == 1 else 24
+        font = _font(size)
         bbox = d.textbbox((0, 0), text, font=font)
         w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
         d.text(((SIZE - w) / 2 - bbox[0], (SIZE - h) / 2 - bbox[1]), text, fill="white", font=font)

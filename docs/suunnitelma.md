@@ -57,7 +57,7 @@ Tilastok. ─┘          (generaattori)              │
 
 1. ✅ Iconset (`defaultGroup`/`skipResize`, `Retkeily/*.png`, polku `<uid>/Retkeily/<kuvake>.png`) toimii ATAK 5.8:ssa (7.10.2026).
 2. ✅ `u-d-f`-viiva ilman korkeutta toimii; silmukkareitit vaativat `fillColor 0` (muuten täyttö).
-3. Hashtag-haku, kun tagit ovat pitkän remarksin lopussa.
+3. ✅ Hashtag-haku toimii, vaikka tagit ovat pitkän remarksin lopussa.
 4. GPX `<rte>` → ATAK-reitti; siirtyykö `<desc>` remarksiin.
 5. KMZ-verkkolinkin päivittyminen ATAKissa ja WinTAKissa.
 6. Datapaketin `onReceiveDelete` ja saman paketin UID:n korvautuminen uudella versiolla.

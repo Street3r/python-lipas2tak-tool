@@ -1,0 +1,93 @@
+"""KMZ (doc.kml + kuvakkeet) ja KML-verkkolinkki (NetworkLink)."""
+from __future__ import annotations
+
+import zipfile
+from dataclasses import dataclass, field
+from pathlib import Path
+from xml.sax.saxutils import escape, quoteattr
+
+from ..geo import Coord, Line
+
+
+def kml_color(hex_rgb: str, alpha: int = 255) -> str:
+    """'#RRGGBB' -> KML:n aabbggrr."""
+    h = hex_rgb.lstrip("#")
+    r, g, b = h[0:2], h[2:4], h[4:6]
+    return f"{alpha:02x}{b}{g}{r}".lower()
+
+
+@dataclass
+class Placemark:
+    id: str
+    name: str
+    description: str
+    style: str
+    point: Coord | None = None
+    lines: list[Line] = field(default_factory=list)
+
+
+@dataclass
+class Folder:
+    name: str
+    placemarks: list[Placemark] = field(default_factory=list)
+
+
+def _coords(line: Line) -> str:
+    return " ".join(f"{lon:.6f},{lat:.6f}" for lon, lat in line)
+
+
+def _placemark(p: Placemark) -> str:
+    if p.point is not None:
+        geom = (f"<Point><altitudeMode>clampToGround</altitudeMode>"
+                f"<coordinates>{p.point[0]:.6f},{p.point[1]:.6f}</coordinates></Point>")
+    elif len(p.lines) == 1:
+        geom = (f"<LineString><tessellate>1</tessellate><altitudeMode>clampToGround</altitudeMode>"
+                f"<coordinates>{_coords(p.lines[0])}</coordinates></LineString>")
+    else:
+        geom = "<MultiGeometry>" + "".join(
+            f"<LineString><tessellate>1</tessellate><altitudeMode>clampToGround</altitudeMode>"
+            f"<coordinates>{_coords(l)}</coordinates></LineString>" for l in p.lines) + "</MultiGeometry>"
+    return (f"<Placemark id={quoteattr(p.id)}><name>{escape(p.name)}</name>"
+            f"<description>{escape(p.description)}</description>"
+            f"<styleUrl>#{p.style}</styleUrl>{geom}</Placemark>")
+
+
+def write_kmz(path: Path, name: str, folders: list[Folder], icon_styles: dict[str, str],
+              line_styles: dict[str, tuple[str, float]], icons_dir: Path) -> None:
+    """icon_styles: {style_id: kuvaketiedosto}, line_styles: {style_id: (#RRGGBB, leveys)}"""
+    styles = []
+    used_icons = set()
+    for sid, icon in icon_styles.items():
+        used_icons.add(icon)
+        styles.append(f'<Style id="{sid}"><IconStyle><scale>1.0</scale>'
+                      f"<Icon><href>files/{escape(icon)}</href></Icon></IconStyle></Style>")
+    for sid, (color, width) in line_styles.items():
+        styles.append(f'<Style id="{sid}"><LineStyle><color>{kml_color(color)}</color>'
+                      f"<width>{width:.1f}</width></LineStyle></Style>")
+    body = "".join(
+        f"<Folder><name>{escape(f.name)}</name>" + "".join(_placemark(p) for p in f.placemarks) + "</Folder>"
+        for f in folders if f.placemarks
+    )
+    doc = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
+           f"<name>{escape(name)}</name>{''.join(styles)}{body}</Document></kml>\n")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("doc.kml", doc)
+        for icon in sorted(used_icons):
+            src = icons_dir / icon
+            if src.exists():
+                z.write(src, f"files/{icon}")
+    tmp.replace(path)
+
+
+def write_network_link(path: Path, name: str, href: str, refresh_s: int) -> None:
+    doc = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<kml xmlns="http://www.opengis.net/kml/2.2"><NetworkLink>'
+           f"<name>{escape(name)}</name><refreshVisibility>0</refreshVisibility>"
+           f"<Link><href>{escape(href)}</href><refreshMode>onInterval</refreshMode>"
+           f"<refreshInterval>{int(refresh_s)}</refreshInterval></Link>"
+           "</NetworkLink></kml>\n")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(doc, encoding="utf-8")

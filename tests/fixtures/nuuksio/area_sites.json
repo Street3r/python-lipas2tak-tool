@@ -1,0 +1,55 @@
+{
+ "kansallispuistot": [
+  {
+   "lipas-id": 606198,
+   "type": {
+    "type-code": 111
+   },
+   "name": "Nuuksion kansallispuisto",
+   "status": "active",
+   "name-localized": {
+    "en": "Nuuksio National Park"
+   },
+   "location": {
+    "city": {
+     "city-code": 49
+    },
+    "geometries": {
+     "type": "FeatureCollection",
+     "features": [
+      {
+       "type": "Feature",
+       "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+         [
+          [
+           24.4,
+           60.27
+          ],
+          [
+           24.62,
+           60.27
+          ],
+          [
+           24.62,
+           60.36
+          ],
+          [
+           24.4,
+           60.36
+          ],
+          [
+           24.4,
+           60.27
+          ]
+         ]
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ ]
+}

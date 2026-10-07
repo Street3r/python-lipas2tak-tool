@@ -1,0 +1,50 @@
+# Alueiden lyhyet nimet tiedostonimiin ja hashtageihin.
+#
+# Lipaksessa nimet ovat muotoa "Nuuksion kansallispuisto" (genetiivi), joten
+# perusmuotoa ei voi päätellä luotettavasti (Oulangan -> Oulanka).
+# Avain = nimen alku ennen "kansallispuisto"/"erämaa-alue" -sanaa.
+# Puuttuvalle nimelle käytetään varasääntöä (viimeinen n pois) ja lokiin
+# kirjataan varoitus, jotta nimi voidaan lisätä tähän.
+
+kansallispuistot:
+  "Etelä-Konneveden": Etelä-Konnevesi
+  "Helvetinjärven": Helvetinjärvi
+  "Hiidenportin": Hiidenportti
+  "Hossan": Hossa
+  "Isojärven": Isojärvi
+  "Itäisen Suomenlahden": Itäinen Suomenlahti
+  "Kauhanevan-Pohjankankaan": Kauhaneva-Pohjankangas
+  "Kolin": Koli
+  "Koloveden": Kolovesi
+  "Kurjenrahkan": Kurjenrahka
+  "Lauhanvuoren": Lauhanvuori
+  "Leivonmäen": Leivonmäki
+  "Lemmenjoen": Lemmenjoki
+  "Liesjärven": Liesjärvi
+  "Linnansaaren": Linnansaari
+  "Nuuksion": Nuuksio
+  "Oulangan": Oulanka
+  "Pallas-Yllästunturin": Pallas-Yllästunturi
+  "Patvinsuon": Patvinsuo
+  "Perämeren": Perämeri
+  "Petkeljärven": Petkeljärvi
+  "Puurijärven ja Isonsuon": Puurijärvi-Isosuo
+  "Pyhä-Häkin": Pyhä-Häkki
+  "Pyhä-Luoston": Pyhä-Luosto
+  "Päijänteen": Päijänne
+  "Repoveden": Repovesi
+  "Riisitunturin": Riisitunturi
+  "Rokuan": Rokua
+  "Salamajärven": Salamajärvi
+  "Sallan": Salla
+  "Saaristomeren": Saaristomeri
+  "Seitsemisen": Seitseminen
+  "Sipoonkorven": Sipoonkorpi
+  "Syötteen": Syöte
+  "Tammisaaren saariston": Tammisaaren saaristo
+  "Teijon": Teijo
+  "Tiilikkajärven": Tiilikkajärvi
+  "Torronsuon": Torronsuo
+  "Urho Kekkosen": Urho Kekkonen
+  "Valkmusan": Valkmusa
+  "Evon": Evo

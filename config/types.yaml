@@ -1,0 +1,224 @@
+# Kohdetyypit ("kind") ja niiden lähteet, ulkoasu ja tagit.
+#
+# Jokainen kohde päätyy täsmälleen yhteen kindiin. Luokittelu käy kindit läpi
+# tässä järjestyksessä ja valitsee ensimmäisen, jonka jokin lähde täsmää.
+# Siksi tarkemmat säännöt (esim. kota nimen perusteella) ovat ennen yleisiä
+# (laavu = muu tyyppi 301).
+#
+# Kentät:
+#   label:    näyttönimi fi/en
+#   tag:      hashtag fi/en (ilman #-merkkiä, vain a-z0-9)
+#   group:    KMZ-kansio / erillinen tyyppikohtainen KMZ (ks. groups alla)
+#   icon:     kuvaketiedosto iconsetissä (icons/<set>/<icon>)
+#   cot_type: CoT-tyyppi merkille (pisteet)
+#   color:    reittiviivan väri #RRGGBB (reitit)
+#   sources:
+#     lipas:  type_codes + valinnainen name_regex (Python regex, case-insensitive)
+#     loi:    Lipaksen /v2/lois loi-typet
+#     osm:    OpenStreetMap-tagit (Overpass), esim. {amenity: toilets}
+
+groups:
+  suojat:          {label: {fi: "Laavut, kodat ja tuvat", en: "Shelters and huts"}}
+  tulentekopaikat: {label: {fi: "Nuotio- ja keittopaikat", en: "Campfire sites"}}
+  nakotornit:      {label: {fi: "Näkötornit ja näköalapaikat", en: "Towers and viewpoints"}}
+  telttailu:       {label: {fi: "Telttailu", en: "Camping"}}
+  kaymalat:        {label: {fi: "Käymälät", en: "Toilets"}}
+  opasteet:        {label: {fi: "Opasteet ja luontokeskukset", en: "Info points"}}
+  muut:            {label: {fi: "Muut palvelut", en: "Other services"}}
+  reitit:          {label: {fi: "Reitit", en: "Routes"}}
+
+kinds:
+  # --- Suojat -------------------------------------------------------------
+  kota:
+    label: {fi: Kota, en: Hut (kota)}
+    tag: {fi: kota, en: kota}
+    group: suojat
+    icon: kota.png
+    cot_type: a-u-G
+    sources:
+      lipas: {type_codes: [301], name_regex: "kota|kåta"}
+  kammi:
+    label: {fi: Kammi, en: Turf hut}
+    tag: {fi: kammi, en: turfhut}
+    group: suojat
+    icon: kota.png
+    cot_type: a-u-G
+    sources:
+      lipas: {type_codes: [301], name_regex: "kammi"}
+  laavu:
+    label: {fi: Laavu, en: Lean-to}
+    tag: {fi: laavu, en: leanto}
+    group: suojat
+    icon: laavu.png
+    cot_type: a-u-G
+    sources:
+      lipas: {type_codes: [301]}
+  tupa:
+    label: {fi: Tupa, en: Hut}
+    tag: {fi: tupa, en: hut}
+    group: suojat
+    icon: tupa.png
+    cot_type: a-u-G
+    sources:
+      lipas: {type_codes: [302]}
+
+  # --- Tulentekopaikat ------------------------------------------------------
+  keittokatos:
+    label: {fi: Keittokatos, en: Cooking shelter}
+    tag: {fi: keittokatos, en: cookingshelter}
+    group: tulentekopaikat
+    icon: keittokatos.png
+    cot_type: a-u-G
+    sources:
+      lipas: {type_codes: [206], name_regex: "keittokatos|katos"}
+      loi: {types: [cooking-shelter]}
+  nuotiopaikka:
+    label: {fi: Nuotiopaikka, en: Campfire site}
+    tag: {fi: nuotiopaikka, en: campfire}
+    group: tulentekopaikat
+    icon: nuotiopaikka.png
+    cot_type: a-u-G
+    sources:
+      lipas: {type_codes: [206]}
+      loi: {types: [fire-pit]}
+
+  # --- Näkötornit ---------------------------------------------------------
+  nakotorni:
+    label: {fi: Näkötorni, en: Observation tower}
+    tag: {fi: nakotorni, en: tower}
+    group: nakotornit
+    icon: nakotorni.png
+    cot_type: a-u-G
+    sources:
+      lipas: {type_codes: [204]}
+      loi: {types: [viewing-platform]}
+  nakoalapaikka:
+    label: {fi: Näköalapaikka, en: Viewpoint}
+    tag: {fi: nakoalapaikka, en: viewpoint}
+    group: nakotornit
+    icon: nakoalapaikka.png
+    cot_type: a-u-G
+    sources:
+      loi: {types: [viewpoint]}
+
+  # --- Telttailu ----------------------------------------------------------
+  telttapaikka:
+    label: {fi: Telttapaikka, en: Tent site}
+    tag: {fi: telttapaikka, en: tentsite}
+    group: telttailu
+    icon: telttapaikka.png
+    cot_type: a-u-G
+    sources:
+      lipas: {type_codes: [202]}
+      loi: {types: [tent-site, reservation-campsite]}
+
+  # --- Käymälät -----------------------------------------------------------
+  kaymala:
+    label: {fi: Käymälä, en: Toilet}
+    tag: {fi: kaymala, en: toilet}
+    group: kaymalat
+    icon: kaymala.png
+    cot_type: a-u-G
+    sources:
+      loi: {types: [dry-toilet, wc]}
+      osm: {tags: {amenity: toilets}}
+
+  # --- Opasteet -----------------------------------------------------------
+  luontokeskus:
+    label: {fi: Luontokeskus, en: Nature centre}
+    tag: {fi: luontokeskus, en: naturecentre}
+    group: opasteet
+    icon: luontokeskus.png
+    cot_type: a-u-G
+    sources:
+      loi: {types: [nature-centre]}
+  opastuspiste:
+    label: {fi: Opastuspiste, en: Info point}
+    tag: {fi: opastuspiste, en: info}
+    group: opasteet
+    icon: opastuspiste.png
+    cot_type: a-u-G
+    sources:
+      lipas: {type_codes: [207]}
+      loi: {types: [information-board]}
+
+  # --- Muut ---------------------------------------------------------------
+  puuvaja:
+    label: {fi: Puuvaja, en: Woodshed}
+    tag: {fi: puuvaja, en: woodshed}
+    group: muut
+    icon: puuvaja.png
+    cot_type: a-u-G
+    sources:
+      loi: {types: [woodshed]}
+  vesipiste:
+    label: {fi: Kaivo / vesipiste, en: Well / water}
+    tag: {fi: vesipiste, en: water}
+    group: muut
+    icon: vesipiste.png
+    cot_type: a-u-G
+    sources:
+      loi: {types: [well, water-source]}
+  rantautumispaikka:
+    label: {fi: Rantautumispaikka, en: Landing spot}
+    tag: {fi: rantautuminen, en: landing}
+    group: muut
+    icon: rantautumispaikka.png
+    cot_type: a-u-G
+    sources:
+      loi: {types: [landing-spot]}
+  pysakointi:
+    label: {fi: Pysäköinti, en: Parking}
+    tag: {fi: pysakointi, en: parking}
+    group: muut
+    icon: pysakointi.png
+    cot_type: a-u-G
+    sources:
+      loi: {types: [parking-spot]}
+
+  # --- Reitit -------------------------------------------------------------
+  # Samankaltaiset reitit samalla värillä (päätös 7).
+  luontopolku:
+    label: {fi: Luontopolku, en: Nature trail}
+    tag: {fi: luontopolku, en: naturetrail}
+    group: reitit
+    color: "#2E9E44"
+    sources:
+      lipas: {type_codes: [4404]}
+  retkeilyreitti:
+    label: {fi: Retkeilyreitti, en: Hiking trail}
+    tag: {fi: vaellus, en: hiking}
+    group: reitit
+    color: "#D7261E"
+    sources:
+      lipas: {type_codes: [4405]}
+  monikayttoreitti:
+    label: {fi: Monikäyttöreitti, en: Multi-use trail}
+    tag: {fi: monikaytto, en: multiuse}
+    group: reitit
+    color: "#E67E22"
+    sources:
+      lipas: {type_codes: [4406]}
+  pyorailyreitti:
+    label: {fi: Pyöräilyreitti, en: Cycling route}
+    tag: {fi: pyoraily, en: cycling}
+    group: reitit
+    color: "#8E44AD"
+    sources:
+      lipas: {type_codes: [4411, 4412]}
+  melontareitti:
+    label: {fi: Melontareitti, en: Canoe route}
+    tag: {fi: melonta, en: paddling}
+    group: reitit
+    color: "#1F6FD1"
+    sources:
+      lipas: {type_codes: [4451, 4452]}
+  # Kävely-/ulkoilureitit (4403) ovat usein lähiliikuntaa, joten oletuksena pois.
+  ulkoilureitti:
+    enabled: false
+    label: {fi: Ulkoilureitti, en: Outdoor route}
+    tag: {fi: ulkoilureitti, en: outdoorroute}
+    group: reitit
+    color: "#7F8C8D"
+    sources:
+      lipas: {type_codes: [4403]}

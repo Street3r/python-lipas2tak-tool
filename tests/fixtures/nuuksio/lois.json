@@ -1,0 +1,77 @@
+[
+ {
+  "id": "aaaaaaaa-0000-4000-8000-000000000001",
+  "loi-type": "dry-toilet",
+  "loi-category": "outdoor-recreation-facilities",
+  "name": {
+   "fi": "Haukkalammen kuivakäymälä"
+  },
+  "status": "active",
+  "event-date": "2026-09-01T10:00:00Z",
+  "geometries": {
+   "type": "FeatureCollection",
+   "features": [
+    {
+     "type": "Feature",
+     "geometry": {
+      "type": "Point",
+      "coordinates": [
+       24.5055,
+       60.3085
+      ]
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "aaaaaaaa-0000-4000-8000-000000000002",
+  "loi-type": "woodshed",
+  "loi-category": "outdoor-recreation-facilities",
+  "name": {
+   "fi": "Haukkalammen puuvaja"
+  },
+  "status": "active",
+  "event-date": "2026-09-01T10:00:00Z",
+  "geometries": {
+   "type": "FeatureCollection",
+   "features": [
+    {
+     "type": "Feature",
+     "geometry": {
+      "type": "Point",
+      "coordinates": [
+       24.505,
+       60.3079
+      ]
+     }
+    }
+   ]
+  }
+ },
+ {
+  "id": "aaaaaaaa-0000-4000-8000-000000000003",
+  "loi-type": "dry-toilet",
+  "loi-category": "outdoor-recreation-facilities",
+  "name": {
+   "fi": "UTP-testikohde kuivakäymälä"
+  },
+  "status": "active",
+  "event-date": "2026-09-01T10:00:00Z",
+  "geometries": {
+   "type": "FeatureCollection",
+   "features": [
+    {
+     "type": "Feature",
+     "geometry": {
+      "type": "Point",
+      "coordinates": [
+       24.51,
+       60.31
+      ]
+     }
+    }
+   ]
+  }
+ }
+]

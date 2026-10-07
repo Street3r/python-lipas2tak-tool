@@ -1,0 +1,516 @@
+[
+ {
+  "lipas-id": 900001,
+  "type": {
+   "type-code": 301
+  },
+  "name": "Haukkalammen laavu",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "Laavu Haukkalammen rannalla. Puuvaja vieressä.",
+  "properties": {
+   "toilet?": true,
+   "water-point": "seasonal"
+  },
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.5052,
+        60.3082
+       ]
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "lipas-id": 900002,
+  "type": {
+   "type-code": 301
+  },
+  "name": "Mustalammen kota",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "Tulisija kodan sisällä.",
+  "properties": {},
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.489,
+        60.317
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "name-localized": {
+   "se": "Mustalammens kåta",
+   "en": "Mustalampi hut"
+  }
+ },
+ {
+  "lipas-id": 900003,
+  "type": {
+   "type-code": 206
+  },
+  "name": "Haukkalammen nuotiopaikka",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "",
+  "properties": {
+   "toilet?": true
+  },
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.506,
+        60.3075
+       ]
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "lipas-id": 900004,
+  "type": {
+   "type-code": 206
+  },
+  "name": "Iso-Holman keittokatos",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "",
+  "properties": {},
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.47,
+        60.323
+       ]
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "lipas-id": 900005,
+  "type": {
+   "type-code": 204
+  },
+  "name": "Kattilajärven lintutorni",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "",
+  "properties": {},
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.56,
+        60.296
+       ]
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "lipas-id": 900006,
+  "type": {
+   "type-code": 202
+  },
+  "name": "Mustalammen telttailualue",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "",
+  "properties": {
+   "toilet?": true
+  },
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.488,
+        60.316
+       ]
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "lipas-id": 900007,
+  "type": {
+   "type-code": 207
+  },
+  "name": "Haukkalammen opastuspiste",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "",
+  "properties": {
+   "parking-place?": true,
+   "toilet?": true
+  },
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.504,
+        60.309
+       ]
+      }
+     }
+    ]
+   }
+  },
+  "www": "https://www.luontoon.fi/nuuksio"
+ },
+ {
+  "lipas-id": 900008,
+  "type": {
+   "type-code": 301
+  },
+  "name": "Testilaavu",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "",
+  "properties": {},
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.5,
+        60.3
+       ]
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "lipas-id": 900009,
+  "type": {
+   "type-code": 301
+  },
+  "name": "Aulangon laavu",
+  "status": "active",
+  "admin": "city-sports",
+  "owner": "state",
+  "comment": "",
+  "properties": {},
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 109
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.46,
+        61.01
+       ]
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "lipas-id": 900010,
+  "type": {
+   "type-code": 302
+  },
+  "name": "Kaitalammen tupa",
+  "status": "out-of-service-temporarily",
+  "admin": "state",
+  "owner": "state",
+  "comment": "",
+  "properties": {},
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "Point",
+       "coordinates": [
+        24.495,
+        60.295
+       ]
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "lipas-id": 900020,
+  "type": {
+   "type-code": 4404
+  },
+  "name": "Haukankierros",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "",
+  "www": "https://www.luontoon.fi/nuuksio/reitit",
+  "properties": {
+   "route-length-km": 4.2,
+   "surface-material": [
+    "soil"
+   ]
+  },
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "LineString",
+       "coordinates": [
+        [
+         24.504,
+         60.309,
+         40.0
+        ],
+        [
+         24.5,
+         60.311,
+         42.0
+        ],
+        [
+         24.495,
+         60.312,
+         44.0
+        ],
+        [
+         24.492,
+         60.314,
+         46.1
+        ]
+       ]
+      },
+      "id": "f-1"
+     },
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "LineString",
+       "coordinates": [
+        [
+         24.492,
+         60.314,
+         46.1
+        ],
+        [
+         24.495,
+         60.316,
+         45.0
+        ],
+        [
+         24.501,
+         60.315,
+         43.0
+        ],
+        [
+         24.504,
+         60.309,
+         40.0
+        ]
+       ]
+      },
+      "id": "f-2"
+     }
+    ]
+   }
+  },
+  "activities": {
+   "outdoor-recreation-routes": {
+    "routes": [
+     {
+      "id": "1b9c2c4e-0000-4000-8000-000000000020",
+      "fids": [
+       "f-1",
+       "f-2"
+      ],
+      "route-name": {
+       "fi": "Haukankierros",
+       "en": "Haukankierros trail"
+      },
+      "description-short": {
+       "fi": "Vaativa kierros Haukkalammen ympäristön kallioilla.",
+       "en": "Demanding loop on the rocky hills around Haukkalampi."
+      },
+      "route-marking": {
+       "fi": "Punaiset merkit",
+       "en": "Red markers"
+      },
+      "accessibility-classification": "inaccessible",
+      "travel-direction": "no-preference"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "lipas-id": 900021,
+  "type": {
+   "type-code": 4405
+  },
+  "name": "Korpinkierros",
+  "status": "active",
+  "admin": "state",
+  "owner": "state",
+  "comment": "Pidempi retkeilyreitti järvimaisemissa.",
+  "properties": {},
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "LineString",
+       "coordinates": [
+        [
+         24.504,
+         60.309
+        ],
+        [
+         24.51,
+         60.315
+        ],
+        [
+         24.52,
+         60.32
+        ],
+        [
+         24.53,
+         60.315
+        ],
+        [
+         24.525,
+         60.308
+        ],
+        [
+         24.504,
+         60.309
+        ]
+       ]
+      }
+     }
+    ]
+   }
+  }
+ }
+]

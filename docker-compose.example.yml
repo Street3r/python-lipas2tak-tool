@@ -1,0 +1,16 @@
+# Kehityskäyttöön. Tuotantopino (ajastus, nginx, feederit) on repossa
+# docker-lipas-integration.
+services:
+  lipas2tak:
+    build: .
+    environment:
+      LIPAS2TAK_PUBLIC_BASE_URL: "http://localhost:8080"
+    volumes:
+      - ./data:/data
+    command: ["run", "--only", "nuuksio", "uusimaa"]
+
+  web:
+    image: nginx:1.27-alpine
+    ports: ["8080:80"]
+    volumes:
+      - ./data/output:/usr/share/nginx/html:ro

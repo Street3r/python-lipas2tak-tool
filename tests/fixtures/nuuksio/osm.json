@@ -1,0 +1,34 @@
+{
+ "kaymala": [
+  {
+   "type": "node",
+   "id": 1001,
+   "lat": 60.30852,
+   "lon": 24.50555,
+   "tags": {
+    "amenity": "toilets"
+   }
+  },
+  {
+   "type": "node",
+   "id": 1002,
+   "lat": 60.3172,
+   "lon": 24.487,
+   "tags": {
+    "amenity": "toilets",
+    "name": "Mustalammen huussi"
+   }
+  },
+  {
+   "type": "way",
+   "id": 2001,
+   "center": {
+    "lat": 60.1699,
+    "lon": 24.9384
+   },
+   "tags": {
+    "amenity": "toilets"
+   }
+  }
+ ]
+}

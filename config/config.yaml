@@ -1,0 +1,77 @@
+# python-lipas2tak-tool – pääasetukset
+# Arvot voi ylikirjoittaa ympäristömuuttujilla, ks. README.
+
+languages: [fi, en]
+
+# Julkinen osoite, josta KMZ-tiedostot ja datapaketit jaetaan.
+# Käytetään KML-verkkolinkeissä (NetworkLink) ja index.html-sivulla.
+public_base_url: "https://example.org/lipas2tak"   # env: LIPAS2TAK_PUBLIC_BASE_URL
+
+paths:
+  cache: data/cache        # raakadata ja välimuisti
+  output: data/output      # julkaistavat tiedostot (nginx tarjoilee tämän)
+  icons: icons/placeholder # väliaikainen kuvakesarja; vaihdetaan luvan jälkeen
+
+sources:
+  lipas:
+    base_url: "https://api.lipas.fi/v2"
+    page_size: 100
+    statuses: [active, out-of-service-temporarily]
+    request_delay_s: 0.3   # kohteliaisuusviive pyyntöjen välissä
+    cache_max_age_h: 20    # yhden ajon aikana ei haeta samaa uudestaan
+  lois:
+    enabled: true
+    statuses: [active]
+  osm:
+    enabled: true
+    overpass_url: "https://overpass-api.de/api/interpreter"
+    # OSM-käymälöistä otetaan vain ne, jotka ovat lähellä muita retkikohteita
+    # tai reittejä (kaupunkien yleiset WC:t jäävät pois).
+    context_radius_m: 300
+    # Jos Lipaksessa/LOI:ssa on käymälä näin lähellä, OSM-kohde ohitetaan.
+    dedupe_radius_m: 40
+  regions:
+    # Tilastokeskuksen maakuntarajat (CC BY 4.0)
+    wfs_url: "https://geo.stat.fi/geoserver/tilastointialueet/wfs"
+    layer: "tilastointialueet:maakunta1000k"
+
+# Testi-/virhedatan suodatus nimen perusteella
+exclude_name_regex: "(?i)\\btesti|testauskohde|testikohde"
+
+areas:
+  # Järjestys = toteutusjärjestys (päätös 3). Vain enabled: true tuotetaan.
+  kansallispuistot:
+    enabled: true
+    lipas_type_codes: [111]
+    label: {fi: Kansallispuisto, en: National park}
+    buffer_m: 500          # reunan pysäköinti- ja opastuspisteet mukaan
+    strip_from_name: "(?i)\\s*kansallispuisto$"
+  eramaat:
+    enabled: false
+    lipas_type_codes: [110]
+    label: {fi: Erämaa-alue, en: Wilderness area}
+    buffer_m: 500
+    strip_from_name: "(?i)\\s*erämaa(-alue)?$"
+  valtion_retkeilyalueet:
+    enabled: false
+    lipas_type_codes: []   # TODO: tyyppikoodi/tietolähde selvitettävä
+    label: {fi: Valtion retkeilyalue, en: State hiking area}
+    buffer_m: 500
+  maakunnat:
+    enabled: true
+
+routes:
+  simplify_tolerance_m: 5.0   # Douglas–Peucker
+  merge_snap_m: 5.0           # palojen yhdistäminen
+  stroke_weight: 4.0
+
+remarks:
+  max_text_chars: 500         # ennen hashtageja
+
+outputs:
+  datapackage: true
+  kmz: true
+  kmz_per_group: true         # erilliset tyyppikohtaiset KMZ:t (laavut/nuotiot/...)
+  network_link: true
+  gpx: true
+  network_link_refresh_s: 86400

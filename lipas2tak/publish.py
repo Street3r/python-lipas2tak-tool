@@ -27,7 +27,7 @@ from .config import Settings
 log = logging.getLogger(__name__)
 
 # Files whose content changes on every run; a change in these alone is not published
-VOLATILE = {"index.json", "index.html", "CHANGELOG.md"}
+VOLATILE = {"index.json", "index.html", "status.json", "CHANGELOG.md"}
 CHANGELOG_KEEP = 52
 
 BRANCH_README = """# {repo_name} – generated data
@@ -130,6 +130,8 @@ def publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, bra
         repo_name=repo_name, licence_url=attribution.LICENSE_URL,
         attribution="; ".join(attribution.ATTRIBUTION)), encoding="utf-8")
     (repo / "ATTRIBUTION.txt").write_text(attribution.notice_text(), encoding="utf-8")
+    if old_changelog:  # keep the changelog; a new entry is added below only for real changes
+        (repo / "CHANGELOG.md").write_text(old_changelog, encoding="utf-8")
 
     _git(repo, "add", "-A")
     changed = [n for n in _git(repo, "diff", "--cached", "--name-only", check=False, capture=True).splitlines() if n]
@@ -138,15 +140,20 @@ def publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, bra
     if not head_exists:
         changed = _git(repo, "ls-files", capture=True).splitlines()
     real = [n for n in changed if n not in VOLATILE]
-    if not real:
-        log.info("Publish: no changes")
+    if not changed:
+        log.info("Publish: nothing to do")
         return "unchanged"
-
-    (repo / "CHANGELOG.md").write_text(_changelog(old_changelog, now, res["changes"], res["features"]),
-                                       encoding="utf-8")
-    _git(repo, "add", "-A")
+    if real:
+        (repo / "CHANGELOG.md").write_text(_changelog(old_changelog, now, res["changes"], res["features"]),
+                                           encoding="utf-8")
+        _git(repo, "add", "-A")
+        msg = f"Data update {now.strftime('%Y-%m-%d')} ({len(real)} files changed)"
+    else:
+        # Only the check time changed: publish it so the pages show the data was verified.
+        # The branch keeps a single commit, so this does not grow the repository.
+        msg = f"Data checked {now.strftime('%Y-%m-%d')}, no changes"
     if dry_run:
-        log.info("Publish (dry run): %d changed files, not pushed", len(real))
+        log.info("Publish (dry run): %s, not pushed", msg)
         return f"dry-run: {len(real)} files"
     ident = {
         "GIT_AUTHOR_NAME": os.environ.get("PUBLISH_GIT_NAME", "lipas2tak publisher"),
@@ -154,12 +161,11 @@ def publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, bra
     }
     ident["GIT_COMMITTER_NAME"], ident["GIT_COMMITTER_EMAIL"] = ident["GIT_AUTHOR_NAME"], ident["GIT_AUTHOR_EMAIL"]
     tree = _git(repo, "write-tree", capture=True)
-    msg = f"Data update {now.strftime('%Y-%m-%d')} ({len(real)} files changed)"
     commit = _git(repo, "commit-tree", tree, "-m", msg, capture=True, env=ident)
     _git(repo, "push", "-q", "--force", "origin", f"{commit}:refs/heads/{branch}")
     _git(repo, "reset", "-q", "--hard", commit)
-    log.info("Published %s to %s (%d files changed)", commit[:8], branch, len(real))
-    return f"published: {len(real)} files"
+    log.info("Published %s to %s: %s", commit[:8], branch, msg)
+    return f"published: {len(real)} files" if real else "checked: no changes"
 
 
 def watch(settings: Settings, source_index: Path, interval_s: float, **kw) -> None:

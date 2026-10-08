@@ -51,7 +51,10 @@ class PublishTests(unittest.TestCase):
 
         # Same data a week later: nothing to push
         t2 = datetime(2026, 10, 15, tzinfo=timezone.utc)
-        self.assertEqual(publish.publish(self.settings, now=t2, **self.kw), "unchanged")
+        self.assertEqual(publish.publish(self.settings, now=t2, **self.kw), "checked: no changes")
+        status = json.loads(git(self.remote, "show", "data:status.json"))
+        self.assertTrue(status["checked"].startswith("2026-10-15"))
+        self.assertNotIn("## 2026-10-15", git(self.remote, "show", "data:CHANGELOG.md"))
 
         # Changed data: new single commit (no history), changelog keeps both entries
         raw = self.tmp / "raw"

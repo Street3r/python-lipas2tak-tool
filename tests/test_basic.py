@@ -259,7 +259,7 @@ class PipelineTests(unittest.TestCase):
         second = snapshot()
         self.assertEqual(set(first), set(second))
         changed = sorted(k for k in first if first[k] != second[k])
-        self.assertEqual(changed, ["index.html", "index.json"])
+        self.assertEqual(changed, ["index.html", "index.json", "status.json"])
 
     def test_package_uid_changes_with_content(self):
         """TAK clients skip a package UID they have already imported, so the UID

@@ -49,6 +49,9 @@ TEXT = {
         "kml_note": "KML layers are an overview: routes are plain lines and hashtag search does not cover them.",
         "licence": "Data licence",
         "search": "Search areas…",
+        "updated": "updated",
+        "checked": "Data checked",
+        "checked_note": "Each area shows the date of its latest change.",
         "search_all": "Find an area",
         "sort": "Sort",
         "sort_name": "Name A–Z",
@@ -81,6 +84,9 @@ TEXT = {
         "kml_note": "KML-tasot ovat yleiskuva: reitit näkyvät viivoina, eikä hashtag-haku löydä niitä.",
         "licence": "Aineiston lisenssi",
         "search": "Hae aluetta…",
+        "updated": "päivitetty",
+        "checked": "Tiedot tarkistettu",
+        "checked_note": "Alueen kohdalla näkyy sen viimeisimmän muutoksen päivä.",
         "search_all": "Etsi alue",
         "sort": "Järjestys",
         "sort_name": "Nimi A–Ö",
@@ -162,6 +168,24 @@ START_SEARCH_JS = """<script>
 </script>"""
 
 
+# Reads status.json (written on every run) so the pages themselves need not change
+CHECKED_JS = """<script>
+fetch('../../status.json', {cache: 'no-store'}).then(r => r.json()).then(s => {
+  const d = new Date(s.checked), loc = document.documentElement.lang === 'en' ? 'en-GB' : 'fi-FI';
+  document.getElementById('checked').textContent =
+    d.toLocaleDateString(loc) + ' ' + d.toLocaleTimeString(loc, {hour: '2-digit', minute: '2-digit'});
+  document.getElementById('checked-line').hidden = false;
+}).catch(() => {});
+</script>"""
+
+
+def _fmt_date(iso: str, lang: str) -> str:
+    if not iso:
+        return ""
+    y, m, d = iso.split("-")
+    return f"{int(d)}.{int(m)}.{y}" if lang == "fi" else iso
+
+
 def _norm(s: str) -> str:
     import unicodedata
     return "".join(c for c in unicodedata.normalize("NFD", s) if not unicodedata.combining(c)).lower()
@@ -189,8 +213,11 @@ def _page(lang: str, title: str, body: str, nav: str, attribution: list[str], li
         f"<!doctype html><html lang='{lang}'><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         f"<title>{escape(title)}</title><style>{CSS}</style><body>"
-        f"<nav>{nav}</nav>{body}"
-        f"<footer>{escape(t['licence'])}: <a href='{escape(licence_url)}'>ODbL 1.0</a> · "
+        f"<nav>{nav}</nav>"
+        f"<p class='muted' id='checked-line' hidden>{escape(t['checked'])}: <b id='checked'></b>. "
+        f"{escape(t['checked_note'])}</p>{body}"
+        + CHECKED_JS
+        + f"<footer>{escape(t['licence'])}: <a href='{escape(licence_url)}'>ODbL 1.0</a> · "
         f"{' · '.join(escape(a) for a in attribution)}</footer></body></html>\n"
     )
 
@@ -242,8 +269,12 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
                     continue
                 label = (t["all"] if key == "all"
                          else category_titles.get(key, {}).get(lang, key))
+                upd = max((e.get("updated", "") for e in entries if key == "all" or e["category"] == key),
+                          default="")
                 cards.append(f"<div class='card'><h3>{escape(label)}</h3>"
-                             f"<div class='qrs'>{_qr_block(t['open'], url(links[key]))}</div>"
+                             + (f"<span class='muted'>{escape(t['updated'])} {_fmt_date(upd, lang)}</span>"
+                                if upd else "")
+                             + f"<div class='qrs'>{_qr_block(t['open'], url(links[key]))}</div>"
                              f"<code>{escape(url(links[key]))}</code></div>")
             body.append(f"<h2>{escape(t['step2'])}</h2><p>{escape(t['step2_text'])}</p>"
                         f"<p class='muted'>{escape(t['kml_note'])}</p><div class='grid'>{''.join(cards)}</div>")
@@ -283,7 +314,9 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
                 cards.append(
                     f"<div class='card' id='{escape(e['slug'])}' data-search='{escape(search)}' "
                     f"data-name='{escape(e['name'])}' data-count='{total}'><h3>{escape(e['name'])}</h3>"
-                    f"<span class='muted'>{total} {escape(t['features'])} · #{escape(e['tag'])}</span>"
+                    f"<span class='muted'>{total} {escape(t['features'])} · #{escape(e['tag'])}"
+                    + (f" · {escape(t['updated'])} {_fmt_date(e.get('updated', ''), lang)}" if e.get("updated") else "")
+                    + "</span>"
                     f"<div class='qrs'>{''.join(qrs)}</div>"
                     f"<p class='dl'>{escape(t['downloads'])}: {''.join(dls)}</p></div>")
             tools = (f"<div class='tools'><input id='q' type='search' placeholder='{escape(t['search'])}' "

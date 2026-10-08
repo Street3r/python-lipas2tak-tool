@@ -288,6 +288,8 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
             "name": title, "tag": area.tag, "files": files, "counts": counts,
             "uids": uid_digests,
             "datapackage_uid": package_uid,
+            # Date of the newest content change in this area (stable between runs)
+            "updated": latest.date().isoformat() if latest else "",
         })
     return entries
 
@@ -339,6 +341,10 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         titles = {c: (settings.get("areas", c, "title", default=None) or {})
                   for c in {e["category"] for e in index_areas}}
         index["share"] = share.write_share_pages(staging, index, titles, settings.languages)
+    # When the sources were last checked. Kept in its own small file so that the
+    # pages stay byte-identical when nothing changed (they read it with JavaScript).
+    (staging / "status.json").write_text(json.dumps({"checked": now.isoformat(timespec="seconds")}),
+                                         encoding="utf-8")
     (staging / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
     (staging / "index.html").write_text(render_index_html(index), encoding="utf-8")
 

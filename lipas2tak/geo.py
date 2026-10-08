@@ -191,7 +191,14 @@ def _ring_contains(ring: Line, pt: Coord) -> bool:
 
 
 class Area:
-    """(Multi)Polygon-alue, jolla on bbox-esisuodatus ja puskuroitu sisältyvyystesti."""
+    """(Multi)Polygon-alue: sisältyvyys- ja puskuritestit bbox-esisuodatuksella.
+
+    Suuret saaristoalueet (tuhansia polygoneja ja satojatuhansia solmuja)
+    vaativat esisuodatusta: polygoneilla ja reunapaloilla (BLOCK solmua)
+    on omat bboxinsa, joten vain lähellä olevat reunat tarkistetaan.
+    """
+
+    BLOCK = 64
 
     def __init__(self, geometry: dict):
         t = geometry["type"]
@@ -202,47 +209,88 @@ class Area:
         else:
             raise ValueError(f"Ei aluegeometria: {t}")
         self.polygons: list[list[Line]] = [[drop_z(r) for r in p] for p in polys]
-        xs = [c[0] for p in self.polygons for c in p[0]]
-        ys = [c[1] for p in self.polygons for c in p[0]]
+        self.poly_bboxes = [_bbox(p[0]) for p in self.polygons]
+        xs = [b[0] for b in self.poly_bboxes] + [b[2] for b in self.poly_bboxes]
+        ys = [b[1] for b in self.poly_bboxes] + [b[3] for b in self.poly_bboxes]
         self.bbox = (min(xs), min(ys), max(xs), max(ys))
+        # Reunapalat: (bbox, solmut), peräkkäiset palat jakavat päätesolmun
+        self.blocks: list[tuple[tuple[float, float, float, float], Line]] = []
+        for poly in self.polygons:
+            for ring in poly:
+                for i in range(0, len(ring) - 1, self.BLOCK):
+                    seg = ring[i:i + self.BLOCK + 1]
+                    self.blocks.append((_bbox(seg), seg))
 
-    def _in_bbox(self, pt: Coord, margin_deg: float) -> bool:
-        x0, y0, x1, y1 = self.bbox
-        return x0 - margin_deg * 2 <= pt[0] <= x1 + margin_deg * 2 and y0 - margin_deg <= pt[1] <= y1 + margin_deg
+    @staticmethod
+    def _margins(lat: float, buffer_m: float) -> tuple[float, float]:
+        dy = buffer_m / 111_000.0
+        return dy / max(0.2, math.cos(math.radians(lat))), dy
+
+    @staticmethod
+    def _bbox_hit(b, pt: Coord, mx: float, my: float) -> bool:
+        return b[0] - mx <= pt[0] <= b[2] + mx and b[1] - my <= pt[1] <= b[3] + my
 
     def contains(self, pt: Coord) -> bool:
-        if not self._in_bbox(pt, 0):
+        if not self._bbox_hit(self.bbox, pt, 0, 0):
             return False
-        for poly in self.polygons:
+        for poly, b in zip(self.polygons, self.poly_bboxes):
+            if not self._bbox_hit(b, pt, 0, 0):
+                continue
             if _ring_contains(poly[0], pt) and not any(_ring_contains(h, pt) for h in poly[1:]):
                 return True
         return False
 
-    def distance_m(self, pt: Coord) -> float:
-        """Etäisyys alueen reunaan metreinä (0, jos piste on sisällä)."""
-        if self.contains(pt):
-            return 0.0
+    def _edge_distance(self, pt: Coord, limit_m: float) -> float:
+        """Lyhin etäisyys reunaan, tarkistaen vain `limit_m` säteen palat."""
+        mx, my = self._margins(pt[1], limit_m)
         proj = LocalProjection(pt[1])
         p = proj.fwd(pt)
         best = math.inf
-        for poly in self.polygons:
-            for ring in poly:
-                prev = proj.fwd(ring[0])
-                for c in ring[1:]:
-                    cur = proj.fwd(c)
-                    best = min(best, _seg_dist(p, prev, cur))
-                    prev = cur
+        for b, seg in self.blocks:
+            if not self._bbox_hit(b, pt, mx, my):
+                continue
+            prev = proj.fwd(seg[0])
+            for c in seg[1:]:
+                cur = proj.fwd(c)
+                d = _seg_dist(p, prev, cur)
+                if d < best:
+                    best = d
+                prev = cur
         return best
 
+    def distance_m(self, pt: Coord, limit_m: float = 50_000.0) -> float:
+        """Etäisyys alueen reunaan metreinä (0 sisällä, inf jos yli `limit_m`)."""
+        if self.contains(pt):
+            return 0.0
+        return self._edge_distance(pt, limit_m)
+
     def within(self, pt: Coord, buffer_m: float = 0.0) -> bool:
-        if not self._in_bbox(pt, buffer_m / 111_000.0):
+        mx, my = self._margins(pt[1], buffer_m)
+        if not self._bbox_hit(self.bbox, pt, mx, my):
             return False
         if self.contains(pt):
             return True
-        return buffer_m > 0 and self.distance_m(pt) <= buffer_m
+        return buffer_m > 0 and self._edge_distance(pt, buffer_m) <= buffer_m
 
     def touches_line(self, line: Line, buffer_m: float = 0.0) -> bool:
         return any(self.within(c, buffer_m) for c in line)
+
+    def length_within_m(self, line: Line, buffer_m: float = 0.0) -> tuple[float, float]:
+        """(alueella oleva pituus, kokonaispituus) metreinä solmujen perusteella."""
+        inside = [self.within(c, buffer_m) for c in line]
+        tot = ins = 0.0
+        for i in range(len(line) - 1):
+            d = haversine(line[i], line[i + 1])
+            tot += d
+            if inside[i] and inside[i + 1]:
+                ins += d
+        return ins, tot
+
+
+def _bbox(pts: Line) -> tuple[float, float, float, float]:
+    xs = [c[0] for c in pts]
+    ys = [c[1] for c in pts]
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 def representative_point(geometry: dict) -> Coord:

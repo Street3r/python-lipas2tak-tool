@@ -107,7 +107,9 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
     for cat, sites in raw.area_sites.items():
         defs = areas_mod.areas_from_lipas_sites(sites, cat, settings.get("areas", cat),
                                                 settings.area_names.get(cat))
-        areas_mod.assign_areas(feats, defs)
+        areas_mod.assign_areas(feats, defs,
+                               route_min_share=settings.get("routes", "area_min_share", default=0.3),
+                               route_min_inside_m=settings.get("routes", "area_min_inside_m", default=3000))
         all_areas.update({a.key: a for a in defs})
     if raw.regions:
         regs = regions.fetch_regions_from_features(raw.regions)
@@ -150,7 +152,7 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
         folders: dict[str, kml.Folder] = {}
         icon_styles: dict[str, str] = {}
         line_styles: dict[str, tuple[str, float]] = {}
-        gpx_files: list[tuple[str, str]] = []
+        gpx_groups: dict[str, tuple[str, str, str, list]] = {}  # ryhmä -> (nimi, remarks, www, viivat)
 
         for f in feats:
             k = kinds[f.kind]
@@ -165,8 +167,9 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                     uid_digests[uid] = _digest(name + rem + repr(line))
                 line_styles[f"s-{k.key}"] = (k.color or "#FF0000", stroke)
                 folder.placemarks.append(kml.Placemark(f.uid, name, rem, f"s-{k.key}", lines=f.lines))
-                gpx_files.append((f"{file_slug(name) or f.uid}_{f.uid}.gpx",
-                                  gpx.route_gpx(name, rem, f.lines, f.www)))
+                gkey = f.group_uid or f.uid
+                g = gpx_groups.setdefault(gkey, (name, rem, f.www, []))
+                g[3].extend(f.lines)
             else:
                 assert f.point
                 path = iconset.iconsetpath(k.icon) if k.icon else None
@@ -202,6 +205,8 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                         kml.write_network_link(nl, gname, f"{base_url}/{files[f'kmz_{group}']}",
                                                outs.get("network_link_refresh_s", 86400))
                         files[f"network_link_{group}"] = str(nl.relative_to(out_root))
+        gpx_files = [(f"{file_slug(n) or key}_{key}.gpx", gpx.route_gpx(n, r, lines, w))
+                     for key, (n, r, w, lines) in gpx_groups.items()]
         if outs.get("gpx", True) and gpx_files:
             p = d / f"{stem}_gpx.zip"
             gpx.write_zip(p, gpx_files)

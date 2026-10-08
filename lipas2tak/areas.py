@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 
 from . import geo
 from .config import Settings, file_slug, slugify
@@ -13,9 +14,11 @@ log = logging.getLogger(__name__)
 
 def short_name(full: str, strip: re.Pattern, names: dict[str, str]) -> str:
     """'Nuuksion kansallispuisto' -> 'Nuuksio' (nimitaulukko tai varasääntö)."""
+    full = unicodedata.normalize("NFC", full)
     stem = strip.sub("", full).strip()
     if not stem or stem == full:
         return full
+    names = {unicodedata.normalize("NFC", k): v for k, v in names.items()}
     if stem in names:
         return names[stem]
     log.warning("Alueen '%s' perusmuoto puuttuu config/area_names.yaml:sta; arvataan", full)
@@ -52,8 +55,14 @@ def areas_from_lipas_sites(sites: list[dict], category: str, cfg: dict,
     return out
 
 
-def assign_areas(features: list[Feature], areas: list[AreaDef]) -> None:
-    """Liittää kohteet erityisalueisiin (puistot ym.) puskurilla."""
+def assign_areas(features: list[Feature], areas: list[AreaDef], route_min_share: float = 0.3,
+                 route_min_inside_m: float = 3000.0) -> None:
+    """Liittää kohteet erityisalueisiin (puistot ym.) puskurilla.
+
+    Reitti(pala) otetaan mukaan, jos alueella kulkee vähintään `route_min_share`
+    sen pituudesta tai vähintään `route_min_inside_m` metriä. Näin alueen läpi
+    kulkevat pitkät pyöräily- ym. reitit eivät tule mukaan pelkän kosketuksen takia.
+    """
     for a in areas:
         shape = geo.Area(a.geometry)
         n = 0
@@ -61,7 +70,14 @@ def assign_areas(features: list[Feature], areas: list[AreaDef]) -> None:
             if f.point is not None:
                 hit = shape.within(f.point, a.buffer_m)
             else:
-                hit = any(shape.touches_line(l, a.buffer_m) for l in f.lines)
+                hit = False
+                for l in f.lines:
+                    if not shape.touches_line(l, a.buffer_m):
+                        continue
+                    ins, tot = shape.length_within_m(l, a.buffer_m)
+                    if tot == 0 or ins / tot >= route_min_share or ins >= route_min_inside_m:
+                        hit = True
+                        break
             if hit:
                 f.areas.append(a.key)
                 n += 1
@@ -87,19 +103,19 @@ def assign_regions(features: list[Feature], regions: list[AreaDef], fallback_km:
         for r, s in shapes:
             if not s.within(pt, fallback_km * 1000):
                 continue
-            d = s.distance_m(pt)
+            d = s.distance_m(pt, fallback_km * 1000)
             if d < best_d:
                 best, best_d = r.key, d
         return best
 
     for f in features:
-        if f.city_code is not None and f.city_code in by_city:
+        if f.point is not None and f.city_code is not None and f.city_code in by_city:
             f.region = by_city[f.city_code]
             continue
         coords = f.all_coords()
         pt = f.point or coords[len(coords) // 2]
         f.region = locate(pt)
-        if f.city_code is not None and f.region:
+        if f.point is not None and f.city_code is not None and f.region:
             by_city[f.city_code] = f.region
     missing = sum(1 for f in features if not f.region)
     if missing:

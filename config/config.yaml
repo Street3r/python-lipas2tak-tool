@@ -64,6 +64,10 @@ routes:
   simplify_tolerance_m: 5.0   # Douglas–Peucker
   merge_snap_m: 5.0           # palojen yhdistäminen
   stroke_weight: 4.0
+  # Alueen (puiston) pakettiin otetaan reittipala, jos alueella kulkee
+  # vähintään tämä osuus sen pituudesta tai vähintään area_min_inside_m metriä.
+  area_min_share: 0.3
+  area_min_inside_m: 3000
 
 remarks:
   max_text_chars: 500         # ennen hashtageja

@@ -53,6 +53,14 @@ Tilastok. ─┘          (generaattori)              │
 - Tyyppikoodi 205 ei ole käytössä; rantautumispaikat tulevat LOI:sta (`landing-spot`).
 - Valtion retkeilyalueiden tyyppikoodi on selvittämättä.
 
+## Ensimmäinen oikea ajo (8.10.2026)
+
+- Haku: 8 475 Lipas-kohdetta, 1 051 LOI:ta, 4 468 OSM-käymälää (joista retkikohteiden lähellä 2 676), 41 kansallispuistoa, 19 maakuntaa. Haku kestää noin 1,5 min, ja käsittely noin 1 min.
+- Kaikille kansallispuistoille paitsi Perämerelle (0 kohdetta) syntyy paketti.
+- Nuuksio: 2 laavua (Holma-Saarijärvi, Takala), 17 käymälää (LOI + OSM), keittokatoksia, telttailualue, lintutorni, polkuja ja reittejä. Metsähallituksen keskeiset laavut ja pääreitit (Haukankierros ym.) **puuttuvat Lipaksesta**, mutta LOI-rajapinnassa on Metsähallituksen käymälöitä.
+- Korjattu: reittipalojen yhdistäminen jumittui (O(n³)) → lineaarinen algoritmi; isojen saaristopuistojen aluetestit nopeutettu (2 min 16 s → 56 s).
+- Reitit jaetaan paloittain alueille: puiston pakettiin tulee pala, jos ≥ 30 % sen pituudesta tai ≥ 3 km kulkee puistossa (`routes.area_min_share`, `area_min_inside_m`). GPX kokoaa palat takaisin yhdeksi tiedostoksi.
+
 ## Testattavaa ATAKissa (MVP)
 
 1. ✅ Iconset (`defaultGroup`/`skipResize`, `Retkeily/*.png`, polku `<uid>/Retkeily/<kuvake>.png`) toimii ATAK 5.8:ssa (7.10.2026).

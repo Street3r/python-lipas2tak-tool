@@ -1,6 +1,7 @@
 """Lähdedatan muunto sisäiseen malliin (Feature) ja kohdetyypin päättely."""
 from __future__ import annotations
 
+import copy
 import logging
 import re
 from typing import Iterable, Optional
@@ -164,10 +165,23 @@ def lipas_site_to_features(site: dict, clf: Classifier, settings: Settings) -> l
             return []
         out.append(Feature(uid=f"lipas-{lid}", name=Localized(fi=name, en=name_loc.get("en") or ""),
                            lines=lines, length_km=props.get("route-length-km"), **base))
+    # Erilliset palat omiksi kohteikseen: alue- ja maakuntajako tehdään palakohtaisesti
+    # (pitkät reitit voivat kulkea usean alueen läpi). GPX kokoaa palat takaisin yhteen.
+    split: list[Feature] = []
     for f in out:
-        if f.length_km is None:
-            f.length_km = round(sum(geo.line_length_m(l) for l in f.lines) / 1000, 1)
-    return out
+        if len(f.lines) == 1:
+            if f.length_km is None:
+                f.length_km = round(geo.line_length_m(f.lines[0]) / 1000, 1)
+            split.append(f)
+            continue
+        for i, line in enumerate(f.lines, 1):
+            g = copy.copy(f)
+            g.uid = f"{f.uid}-{i}"
+            g.lines = [line]
+            g.length_km = round(geo.line_length_m(line) / 1000, 1)
+            g.group_uid = f.uid
+            split.append(g)
+    return split
 
 
 # --- Lipas LOIs ---------------------------------------------------------------

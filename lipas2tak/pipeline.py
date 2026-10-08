@@ -82,8 +82,11 @@ def fetch_raw(settings: Settings, clf: normalize.Classifier) -> RawData:
 def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
                    ) -> tuple[list[Feature], dict[str, AreaDef]]:
     feats: list[Feature] = []
-    for s in raw.sites:
+    log.info("Käsitellään %d Lipas-kohdetta ja %d LOI:ta", len(raw.sites), len(raw.lois))
+    for n, s in enumerate(raw.sites, 1):
         feats.extend(normalize.lipas_site_to_features(s, clf, settings))
+        if n % 2000 == 0:
+            log.info("  %d/%d", n, len(raw.sites))
     for l in raw.lois:
         f = normalize.loi_to_feature(l, clf)
         if f:
@@ -99,6 +102,7 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
         log.info("OSM %s: %d/%d otettu mukaan", kind, len(kept), len(cand))
         feats.extend(kept)
 
+    log.info("Kohteita normalisoinnin jälkeen: %d", len(feats))
     all_areas: dict[str, AreaDef] = {}
     for cat, sites in raw.area_sites.items():
         defs = areas_mod.areas_from_lipas_sites(sites, cat, settings.get("areas", cat),

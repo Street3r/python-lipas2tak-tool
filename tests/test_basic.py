@@ -39,6 +39,25 @@ class GeoTests(unittest.TestCase):
         lines = [[center, (24.01, 60.0)], [center, (23.99, 60.0)], [center, (24.0, 60.01)]]
         self.assertEqual(len(geo.merge_lines(lines)), 3)
 
+    def test_merge_lines_many_pieces_fast(self):
+        import random, time
+        pts = [(24.0 + i * 0.001, 60.0) for i in range(3001)]
+        pieces = [[pts[i], pts[i + 1]] for i in range(3000)]
+        random.Random(1).shuffle(pieces)
+        pieces = [p if i % 2 else p[::-1] for i, p in enumerate(pieces)]
+        t = time.time()
+        merged = geo.merge_lines(pieces)
+        self.assertLess(time.time() - t, 2.0)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(len(merged[0]), 3001)
+
+    def test_merge_lines_loop(self):
+        a = [(24.0, 60.0), (24.01, 60.0), (24.01, 60.01)]
+        b = [(24.01, 60.01), (24.0, 60.01), (24.0, 60.0)]
+        merged = geo.merge_lines([a, b])
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0][0], merged[0][-1])
+
     def test_area_buffer(self):
         sq = {"type": "Polygon", "coordinates": [[[24, 60], [25, 60], [25, 61], [24, 61], [24, 60]]]}
         a = geo.Area(sq)

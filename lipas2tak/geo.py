@@ -75,51 +75,76 @@ def simplify(line: Line, tolerance_m: float) -> Line:
 
 
 def merge_lines(lines: Iterable[Line], snap_m: float = 5.0) -> list[Line]:
-    """Yhdistää päistään toisiinsa liittyvät viivat (linemerge).
+    """Yhdistää päistään toisiinsa liittyvät viivat (linemerge), O(n).
 
-    Viivat, joiden päätepisteet ovat alle `snap_m` metrin päässä toisistaan,
-    liitetään yhteen. Haarautuvissa kohdissa (yli kaksi päätä samassa
-    pisteessä) liitosta ei tehdä, jolloin haarat jäävät omiksi viivoikseen.
+    Päätepisteet, jotka ovat alle `snap_m` metrin päässä toisistaan, katsotaan
+    samaksi solmuksi. Viivat ketjutetaan solmujen läpi, joissa kohtaa täsmälleen
+    kaksi viivanpäätä. Haarautumiskohdissa (>2 päätä) ketju katkeaa, jolloin
+    haarat jäävät omiksi viivoikseen. Suljetut silmukat säilyvät silmukoina.
     """
     parts = [list(l) for l in lines if len(l) >= 2]
     if len(parts) <= 1:
         return parts
 
-    def near(a: Coord, b: Coord) -> bool:
-        return haversine(a, b) <= snap_m
+    # --- Päätepisteiden solmut (ruudukko + naapuriruudut) ---
+    lat0 = sum(p[0][1] for p in parts) / len(parts)
+    proj = LocalProjection(lat0)
+    cell = max(snap_m, 0.5)
+    grid: dict[tuple[int, int], list[tuple[float, float, int]]] = {}
+    node_count = 0
 
-    def degree(pt: Coord) -> int:
-        n = 0
-        for p in parts:
-            n += near(p[0], pt) + near(p[-1], pt)
-        return n
+    def node_of(c: Coord) -> int:
+        nonlocal node_count
+        x, y = proj.fwd(c)
+        kx, ky = int(math.floor(x / cell)), int(math.floor(y / cell))
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for nx, ny, nid in grid.get((kx + dx, ky + dy), ()):
+                    if math.hypot(nx - x, ny - y) <= snap_m:
+                        return nid
+        nid = node_count
+        node_count += 1
+        grid.setdefault((kx, ky), []).append((x, y, nid))
+        return nid
 
-    changed = True
-    while changed:
-        changed = False
-        for i in range(len(parts)):
-            a = parts[i]
-            for j in range(len(parts)):
-                if i == j:
-                    continue
-                b = parts[j]
-                joined = None
-                if near(a[-1], b[0]) and degree(a[-1]) == 2:
-                    joined = a + b[1:]
-                elif near(a[-1], b[-1]) and degree(a[-1]) == 2:
-                    joined = a + b[::-1][1:]
-                elif near(a[0], b[-1]) and degree(a[0]) == 2:
-                    joined = b + a[1:]
-                elif near(a[0], b[0]) and degree(a[0]) == 2:
-                    joined = b[::-1] + a[1:]
-                if joined is not None:
-                    parts = [p for k, p in enumerate(parts) if k not in (i, j)]
-                    parts.append(joined)
-                    changed = True
-                    break
-            if changed:
+    edges = [(p, node_of(p[0]), node_of(p[-1])) for p in parts]
+    adj: dict[int, list[int]] = {}
+    for i, (_, a, b) in enumerate(edges):
+        adj.setdefault(a, []).append(i)
+        adj.setdefault(b, []).append(i)  # silmukka (a == b) lasketaan kahdesti
+
+    used = [False] * len(edges)
+
+    def oriented(i: int, from_node: int) -> tuple[Line, int]:
+        line, a, b = edges[i]
+        return (line, b) if a == from_node else (line[::-1], a)
+
+    def walk(start_edge: int, from_node: int) -> Line:
+        used[start_edge] = True
+        coords, cur = oriented(start_edge, from_node)
+        coords = list(coords)
+        while len(adj[cur]) == 2:
+            nxt = [e for e in adj[cur] if not used[e]]
+            if not nxt:
                 break
-    return parts
+            used[nxt[0]] = True
+            seg, cur2 = oriented(nxt[0], cur)
+            coords.extend(seg[1:])
+            cur = cur2
+        return coords
+
+    out: list[Line] = []
+    # Ensin ketjut, jotka alkavat päätepisteestä tai haarautumasta
+    for node, es in adj.items():
+        if len(es) != 2:
+            for e in es:
+                if not used[e]:
+                    out.append(walk(e, node))
+    # Jäljelle jäävät ovat suljettuja silmukoita
+    for i, (_, a, _) in enumerate(edges):
+        if not used[i]:
+            out.append(walk(i, a))
+    return out
 
 
 class GridIndex:

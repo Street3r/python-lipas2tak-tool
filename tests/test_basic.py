@@ -196,10 +196,10 @@ class PipelineTests(unittest.TestCase):
         self.run_once()
         out = self.tmp / "out"
         idx = json.loads((out / "index.json").read_text())
-        self.assertEqual(idx["links"]["fi"]["all"], "lipas2tak_fi.kml")
-        self.assertEqual(idx["links"]["en"]["maakunnat"], "maakunnat_en.kml")
+        self.assertEqual(idx["links"]["fi"]["all"], "links/all_fi.kml")
+        self.assertEqual(idx["links"]["en"]["maakunnat"], "links/maakunnat_en.kml")
         ns = {"k": "http://www.opengis.net/kml/2.2"}
-        root = ET.parse(out / "lipas2tak_fi.kml").getroot()
+        root = ET.parse(out / "links/all_fi.kml").getroot()
         folders = root.findall("k:Document/k:Folder", ns)
         self.assertEqual([f.find("k:name", ns).text for f in folders], ["Kansallispuistot", "Maakunnat"])
         hrefs = [h.text for h in root.iter("{http://www.opengis.net/kml/2.2}href")]
@@ -211,7 +211,7 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue((d / "nuuksio_fi.kml").exists())
         self.assertFalse(list(d.glob("nuuksio_fi_*.kml")))
         self.assertTrue(list(d.glob("nuuksio_fi_*.kmz")))
-        self.assertIn("lipas2tak_fi.kml", (out / "index.html").read_text())
+        self.assertIn("links/all_fi.kml", (out / "index.html").read_text())
 
     def test_change_detection(self):
         self.run_once()

@@ -321,8 +321,8 @@ def _category_title(settings: Settings, category: str, lang: str) -> str:
 def write_link_collections(settings: Settings, entries: list[dict], out_root: Path) -> dict:
     """Top-level KML files with network links to every area's KMZ.
 
-    Per language: lipas2tak_<lang>.kml (all categories, one folder each) and
-    <category>_<lang>.kml (one category). Returns {lang: {"all"|category: path}}.
+    Per language: links/all_<lang>.kml (all categories, one folder each) and
+    links/<category>_<lang>.kml (one category). Returns {lang: {"all"|category: path}}.
     """
     outs = settings.get("outputs") or {}
     if not (outs.get("kmz", True) and outs.get("network_link", True) and outs.get("root_links", True)):
@@ -342,13 +342,13 @@ def write_link_collections(settings: Settings, entries: list[dict], out_root: Pa
             ctitle = _category_title(settings, category, lang)
             visible = bool(visible_cfg.get(category, True))
             sections.append((ctitle, visible, links))
-            path = out_root / f"{category}_{lang}.kml"
+            path = out_root / "links" / f"{category}_{lang}.kml"
             kml.write_link_collection(path, f"Lipas – {ctitle}", [(ctitle, visible, links)], refresh)
-            result.setdefault(lang, {})[category] = path.name
+            result.setdefault(lang, {})[category] = f"links/{path.name}"
         if sections:
-            path = out_root / f"lipas2tak_{lang}.kml"
+            path = out_root / "links" / f"all_{lang}.kml"
             kml.write_link_collection(path, "Lipas", sections, refresh)
-            result.setdefault(lang, {})["all"] = path.name
+            result.setdefault(lang, {})["all"] = f"links/{path.name}"
     return result
 
 

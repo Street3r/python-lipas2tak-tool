@@ -8,7 +8,7 @@ Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipa
 | `*.kmz` (all features, one folder per type) | import, or target of a KML network link |
 | `*_<group>.kmz` | per-group layers (shelters, campfire sites, towers …) |
 | `*.kml` (NetworkLink) | auto-refreshing link to the area's KMZ |
-| `lipas2tak_<lang>.kml`, `<category>_<lang>.kml` | one network link file covering all areas, a folder per category |
+| `links/all_<lang>.kml`, `links/<category>_<lang>.kml` | one network link file covering all areas, a folder per category |
 | `*_gpx.zip` (`<rte>`) | routes that ATAK converts into navigable routes |
 | `iconset/lipas2tak_iconset.zip` | icon set, installed once |
 | `index.json` / `index.html` | catalogue of outputs for feeders and people |
@@ -51,8 +51,8 @@ Tests: `python -m unittest discover -s tests`
 ```
 data/output/
   index.json, index.html
-  lipas2tak_<lang>.kml              network links to all areas
-  kansallispuistot_<lang>.kml, maakunnat_<lang>.kml
+  links/all_<lang>.kml              network links to all areas
+  links/kansallispuistot_<lang>.kml, links/maakunnat_<lang>.kml
   iconset/lipas2tak_iconset.zip
   fi|en/kansallispuistot|maakunnat/<slug>/
     <slug>_<lang>.zip               data package
@@ -65,9 +65,9 @@ Files are written to a staging directory and swapped in at once, so features rem
 
 ### KML network links in ATAK
 
-ATAK (4.2.1+) adds network links via **Import → KML Link**: give a name, paste the URL and enable auto refresh with an interval in seconds. The link is listed in Overlay Manager → Network Resources; nested links (the areas in `lipas2tak_<lang>.kml`) appear as child links that can be switched on and off and whose intervals can be changed.
+ATAK (4.2.1+) adds network links via **Import → KML Link**: give a name, paste the URL and enable auto refresh with an interval in seconds. The link is listed in Overlay Manager → Network Resources; nested links (the areas in `links/all_<lang>.kml`) appear as child links that can be switched on and off and whose intervals can be changed.
 
-- One URL for everything: `<base url>/lipas2tak_fi.kml` (national parks on, regions off by default).
+- One URL for everything: `<base url>/links/all_fi.kml` (national parks on, regions off by default).
 - A single area: `<base url>/fi/kansallispuistot/nuuksio/nuuksio_fi.kmz`.
 - WinTAK and Google Earth: open the `.kml` file.
 

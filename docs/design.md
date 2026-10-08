@@ -59,7 +59,7 @@ Statistics Fin. ─┘        (generator)                 │
 ## KML network links
 
 - ATAK: Import → *KML Link* (URL + auto refresh interval). Since ATAK 4.2.1 nested network links are shown as child links in Overlay Manager and their intervals can be changed; 4.3 improved nested link handling.
-- Generated: a network link `.kml` per area (to its KMZ), and per language `lipas2tak_<lang>.kml` plus `<category>_<lang>.kml` with a folder per category. Regions are `visibility 0` by default (`outputs.root_links_visible`).
+- Generated: a network link `.kml` per area (to its KMZ), and per language `links/all_<lang>.kml` plus `links/<category>_<lang>.kml` with a folder per category. Regions are `visibility 0` by default (`outputs.root_links_visible`).
 - Per-group network links are off by default (`outputs.network_link_per_group`): the KMZ already has a folder per group, and ~1,000 link files were too many to navigate. Per-group KMZ files are still written.
 - Refresh interval 86,400 s; the data changes weekly.
 - To test: does ATAK fetch children with `visibility 0` before they are switched on; plain HTTP on an internal address; WinTAK behaviour.
@@ -78,7 +78,7 @@ Statistics Fin. ─┘        (generator)                 │
 1. ✅ Iconset (`defaultGroup`/`skipResize`, `Retkeily/*.png`) works in ATAK 5.8.
 2. ✅ `u-d-f` lines without elevation work; loops need `fillColor 0`.
 3. ✅ Hashtag search works even when tags are at the end of long remarks.
-4. KML Link with `lipas2tak_fi.kml`: child links, visibility, refresh.
+4. KML Link with `links/all_fi.kml`: child links, visibility, refresh.
 5. `b-m-r` routes with named waypoints: navigation and checkpoint names.
 6. GPX `<rte>` → ATAK route; whether `<desc>` ends up in remarks.
 7. KMZ network link refresh in ATAK and WinTAK.

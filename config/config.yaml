@@ -95,7 +95,7 @@ outputs:
   network_link: true          # <area>_<lang>.kml network link next to each KMZ
   network_link_per_group: false  # network links for the per-group KMZ files as well
   # Top-level KML files with network links to all areas:
-  # lipas2tak_<lang>.kml (all categories) and <category>_<lang>.kml
+  # links/all_<lang>.kml (all categories) and links/<category>_<lang>.kml
   root_links: true
   # Whether the areas of a category are switched on by default in those files
   root_links_visible:

@@ -186,6 +186,8 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
         files: dict[str, str] = {}
         cot_items: list[tuple[str, str, str]] = []
         uid_digests: dict[str, str] = {}
+        latest: Optional[datetime] = None   # newest content change in this package
+        package_uid = ""
         folders: dict[str, kml.Folder] = {}
         icon_styles: dict[str, str] = {}
         line_styles: dict[str, tuple[str, float]] = {}
@@ -201,6 +203,7 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                 for uid, line in parts:
                     digest = _digest(name + rem + repr(line) + repr(f.waypoints and [i for i, _ in f.waypoints]))
                     t = _since(times, f"{area.key}/{lang}:{uid}", digest, now)
+                    latest = max(latest, t) if latest else t
                     if route_format == "shape":
                         xml = cot.polyline(uid, line, name, rem, k.color or "#FF0000", stroke, now=t)
                     else:
@@ -226,6 +229,7 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                 path = iconset.iconsetpath(k.icon) if k.icon else None
                 digest = _digest(name + rem + repr(f.point) + (path or ""))
                 t = _since(times, f"{area.key}/{lang}:{f.uid}", digest, now)
+                latest = max(latest, t) if latest else t
                 xml = cot.marker(f.uid, k.cot_type, f.point[1], f.point[0], name, rem, path, now=t)
                 cot_items.append((f.uid, name, xml))
                 uid_digests[f.uid] = digest
@@ -235,8 +239,12 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
 
         if outs.get("datapackage", True) and cot_items:
             p = d / f"{stem}.zip"
-            datapackage.write(p, f"{title} ({lang})", f"{area.key}/{lang}", cot_items,
-                              remarks=attribution.SHORT, notice=attribution.notice_text())
+            # The version date in the name shows which edition is loaded; the package
+            # UID changes with the content (see writers/datapackage.py)
+            version = latest.strftime("%Y-%m-%d") if latest else ""
+            package_uid = datapackage.write(p, f"{title} ({lang}) {version}".strip(), f"{area.key}/{lang}",
+                                            cot_items, remarks=attribution.SHORT,
+                                            notice=attribution.notice_text())
             files["datapackage"] = str(p.relative_to(out_root))
         if outs.get("kmz", True) and cot_items:
             p = d / f"{stem}.kmz"
@@ -273,6 +281,7 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
             "key": area.key, "category": area.category, "slug": area.slug, "lang": lang,
             "name": title, "tag": area.tag, "files": files, "counts": counts,
             "uids": uid_digests,
+            "datapackage_uid": package_uid,
         })
     return entries
 

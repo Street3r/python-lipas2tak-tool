@@ -221,6 +221,40 @@ class PipelineTests(unittest.TestCase):
         changed = sorted(k for k in first if first[k] != second[k])
         self.assertEqual(changed, ["index.html", "index.json"])
 
+    def test_package_uid_changes_with_content(self):
+        """TAK clients skip a package UID they have already imported, so the UID
+        must change whenever the content changes, and only then."""
+        out = self.tmp / "out"
+
+        def uids():
+            idx = json.loads((out / "index.json").read_text())
+            res = {}
+            for e in idx["areas"]:
+                with zipfile.ZipFile(out / e["files"]["datapackage"]) as z:
+                    man = ET.fromstring(z.read("MANIFEST/manifest.xml"))
+                uid = man.find("Configuration/Parameter[@name='uid']").get("value")
+                self.assertEqual(uid, e["datapackage_uid"])
+                res[f"{e['key']}/{e['lang']}"] = uid
+            return res
+
+        pipeline.run(self.settings, self.raw, now=datetime(2026, 10, 7, tzinfo=timezone.utc))
+        first = uids()
+        self.assertEqual(len(set(first.values())), len(first))      # unique per area and language
+        pipeline.run(self.settings, self.raw, now=datetime(2026, 10, 14, tzinfo=timezone.utc))
+        self.assertEqual(uids(), first)                               # unchanged content -> same UID
+
+        site = next(s for s in self.raw.sites if s.get("lipas-id") == 900001)
+        site["name"] = site["name"] + " (uusi)"
+        pipeline.run(self.settings, self.raw, now=datetime(2026, 10, 21, tzinfo=timezone.utc))
+        third = uids()
+        self.assertNotEqual(third["kansallispuistot/nuuksio/fi"], first["kansallispuistot/nuuksio/fi"])
+        self.assertNotEqual(third["maakunnat/uusimaa/fi"], first["maakunnat/uusimaa/fi"])
+        self.assertEqual(third["maakunnat/kanta-hame/fi"], first["maakunnat/kanta-hame/fi"])
+        with zipfile.ZipFile(out / "fi/kansallispuistot/nuuksio/nuuksio_fi.zip") as z:
+            name = ET.fromstring(z.read("MANIFEST/manifest.xml")).find(
+                "Configuration/Parameter[@name='name']").get("value")
+        self.assertTrue(name.endswith("2026-10-21"), name)          # version date of the newest change
+
     def test_network_link_collections(self):
         self.run_once()
         out = self.tmp / "out"

@@ -82,7 +82,9 @@ The URLs must stay stable, so the files are served from your own web server (ngi
 
 ### Publishing
 
-`lipas2tak publish` builds a public version from saved raw data (always the default icon set, public base URL, no per-group KMZ files) and force-pushes it as a single commit to a git branch, e.g. one served by GitHub Pages. Nothing is pushed when only the run time changed: outputs are deterministic (fixed zip timestamps; CoT times record when an item's content last changed). With `--watch <index.json>` it publishes after every generator run. See docker-lipas-integration for the container setup.
+`lipas2tak publish` builds a public version from saved raw data (always the default icon set, public base URL, no per-group KMZ files) and force-pushes it as a single commit to a git branch, e.g. one served by GitHub Pages. Nothing is pushed when only the run time changed: outputs are deterministic (fixed zip timestamps; CoT times record when an item's content last changed).
+
+Data package UIDs change whenever the package content changes (uuid5 of area key + content hash), because TAK clients skip a package UID they have already imported. Unchanged content keeps its UID, so re-imports are skipped. With `--watch <index.json>` it publishes after every generator run. See docker-lipas-integration for the container setup.
 
 More details: [docs/design.md](docs/design.md).
 

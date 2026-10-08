@@ -3,11 +3,16 @@
 Layout (as exported by ATAK):
     MANIFEST/manifest.xml
     <uid>/<uid>.cot
-The package UID is deterministic (uuid5 of the name), so a new version
-replaces the old one in ATAK instead of creating parallel packages.
+The package UID is derived from the area key AND the content: TAK clients
+skip a package whose UID they have already imported, so the UID changes
+whenever anything in the package changes, and stays the same when nothing
+did (a re-import of identical content is skipped). CoT items keep their own
+stable UIDs, so a new version updates the existing markers and routes
+instead of duplicating them.
 """
 from __future__ import annotations
 
+import hashlib
 import uuid
 import zipfile
 from pathlib import Path
@@ -17,19 +22,32 @@ from . import ziputil
 NAMESPACE = uuid.UUID("6b1c2b9e-1f55-4d0e-9c4a-6c2a3c5d2a10")
 
 
-def package_uid(key: str) -> str:
-    return str(uuid.uuid5(NAMESPACE, key))
+def content_hash(items: list[tuple[str, str, str]], extra_files=None, remarks: str = "",
+                 notice: str = "") -> str:
+    h = hashlib.sha256()
+    for uid, title, xml in sorted(items):
+        h.update(f"{uid}\0{title}\0{xml}\0".encode())
+    for zpath, data in sorted(extra_files or []):
+        h.update(zpath.encode() + b"\0" + (data if isinstance(data, bytes) else data.encode()) + b"\0")
+    h.update(remarks.encode() + b"\0" + notice.encode())
+    return h.hexdigest()
+
+
+def package_uid(key: str, digest: str = "") -> str:
+    """uuid5 of the area key and the content digest."""
+    return str(uuid.uuid5(NAMESPACE, f"{key}|{digest}" if digest else key))
 
 
 def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
           extra_files: list[tuple[str, bytes]] | None = None,
-          remarks: str = "", notice: str = "") -> None:
+          remarks: str = "", notice: str = "") -> str:
     """items: [(uid, name, cot_xml)], extra_files: [(zip path, content)].
 
     `remarks` is shown with the package in ATAK; `notice` is stored as
     ATTRIBUTION.txt, which ATAK does not import (ignore="true").
     """
     path.parent.mkdir(parents=True, exist_ok=True)
+    pkg_uid = package_uid(key, content_hash(items, extra_files, f"{name}\0{remarks}", notice))
     contents = []
     for uid, title, _ in items:
         contents.append(
@@ -47,7 +65,7 @@ def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<MissionPackageManifest version="2">\n'
         "   <Configuration>\n"
-        f'      <Parameter name="uid" value="{package_uid(key)}"/>\n'
+        f'      <Parameter name="uid" value="{pkg_uid}"/>\n'
         f"      <Parameter name=\"name\" value={quoteattr(name)}/>\n"
         '      <Parameter name="onReceiveDelete" value="true"/>\n'
         + remarks_param +
@@ -65,3 +83,4 @@ def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
         if notice:
             ziputil.writestr(z, "ATTRIBUTION.txt", notice)
     tmp.replace(path)
+    return pkg_uid

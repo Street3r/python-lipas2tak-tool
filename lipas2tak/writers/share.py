@@ -10,7 +10,6 @@ for iTAK, WinTAK and browsers.
 """
 from __future__ import annotations
 
-import json
 import logging
 from html import escape
 from pathlib import Path
@@ -52,8 +51,7 @@ TEXT = {
         "search": "Search areas…",
         "updated": "updated",
         "checked": "Data checked",
-        "next_check": "next check expected",
-        "rel": {"today": "today", "tomorrow": "tomorrow", "days": "in about {n} days", "soon": "soon"},
+        "interval": "data is checked about every {n} days",
         "checked_note": "Each area shows the date of its latest change.",
         "search_all": "Find an area",
         "sort": "Sort",
@@ -89,8 +87,7 @@ TEXT = {
         "search": "Hae aluetta…",
         "updated": "päivitetty",
         "checked": "Tiedot tarkistettu",
-        "next_check": "seuraava tarkistus arviolta",
-        "rel": {"today": "tänään", "tomorrow": "huomenna", "days": "noin {n} päivän kuluttua", "soon": "pian"},
+        "interval": "tietoja tarkistetaan arviolta {n} päivän välein",
         "checked_note": "Alueen kohdalla näkyy sen viimeisimmän muutoksen päivä.",
         "search_all": "Etsi alue",
         "sort": "Järjestys",
@@ -177,13 +174,12 @@ START_SEARCH_JS = """<script>
 CHECKED_JS = """<script>
 fetch('../../status.json', {cache: 'no-store'}).then(r => r.json()).then(s => {
   const loc = document.documentElement.lang === 'en' ? 'en-GB' : 'fi-FI';
-  const rel = JSON.parse(document.getElementById('checked-line').dataset.rel);
-  document.getElementById('checked').textContent = new Date(s.checked).toLocaleDateString(loc);
+  const line = document.getElementById('checked-line');
+  const checked = new Date(s.checked);
+  document.getElementById('checked').textContent = checked.toLocaleDateString(loc);
   if (s.next_check) {
-    const nx = new Date(s.next_check), days = Math.ceil((nx - Date.now()) / 86400000);
-    const when = days < 0 ? rel.soon : days === 0 ? rel.today : days === 1 ? rel.tomorrow
-               : rel.days.replace('{n}', days);
-    document.getElementById('next').textContent = nx.toLocaleDateString(loc) + ' (' + when + ')';
+    const days = Math.round((new Date(s.next_check) - checked) / 86400000);
+    document.getElementById('next').textContent = line.dataset.interval.replace('{n}', days);
     document.getElementById('next-wrap').hidden = false;
   }
   document.getElementById('checked-line').hidden = false;
@@ -226,8 +222,8 @@ def _page(lang: str, title: str, body: str, nav: str, attribution: list[str], li
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         f"<title>{escape(title)}</title><style>{CSS}</style><body>"
         f"<nav>{nav}</nav>"
-        f"<p class='muted' id='checked-line' data-rel='{escape(json.dumps(t['rel'], ensure_ascii=False))}' hidden>{escape(t['checked'])}: <b id='checked'></b>"
-        f"<span id='next-wrap' hidden>, {escape(t['next_check'])} <b id='next'></b></span>. "
+        f"<p class='muted' id='checked-line' data-interval='{escape(t['interval'])}' hidden>{escape(t['checked'])}: <b id='checked'></b>"
+        f"<span id='next-wrap' hidden>, <span id='next'></span></span>. "
         f"{escape(t['checked_note'])}</p>{body}"
         + CHECKED_JS
         + f"<footer>{escape(t['licence'])}: <a href='{escape(licence_url)}'>ODbL 1.0</a> · "

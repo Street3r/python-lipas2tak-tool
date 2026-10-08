@@ -112,9 +112,19 @@ def assign_regions(features: list[Feature], regions: list[AreaDef], fallback_km:
         if f.point is not None and f.city_code is not None and f.city_code in by_city:
             f.region = by_city[f.city_code]
             continue
-        coords = f.all_coords()
-        pt = f.point or coords[len(coords) // 2]
-        f.region = locate(pt)
+        if f.point is not None:
+            f.region = locate(f.point)
+        else:
+            # Reitti: enemmistö näytepisteistä (keskipiste voi olla rajan takana,
+            # esim. Norjan tai Ruotsin puolella kulkevat pyöräilyreitit)
+            coords = f.all_coords()
+            step = max(1, len(coords) // 15)
+            votes: dict[str, int] = {}
+            for c in coords[::step]:
+                k = locate(c)
+                if k:
+                    votes[k] = votes.get(k, 0) + 1
+            f.region = max(votes, key=votes.get) if votes else None
         if f.point is not None and f.city_code is not None and f.region:
             by_city[f.city_code] = f.region
     missing = sum(1 for f in features if not f.region)

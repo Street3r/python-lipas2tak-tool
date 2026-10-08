@@ -1,4 +1,4 @@
-"""CoT remarks / KML-kuvaus / GPX desc -tekstit kielittäin hashtageineen."""
+"""CoT remarks / KML description / GPX desc texts per language, with hashtags."""
 from __future__ import annotations
 
 from .config import Kind, Settings

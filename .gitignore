@@ -8,6 +8,7 @@ data/
 *.tmp
 .pytest_cache/
 
-# Pilotin kuvakkeet (tekijänoikeus: Metsähallitus) eivät kuulu repoon
-icons/luontoon/*
-!icons/luontoon/.gitkeep
+# Custom / third-party icon sets are not committed (see icons/README.md)
+icons/custom/*
+!icons/custom/.gitkeep
+icons/luontoon/

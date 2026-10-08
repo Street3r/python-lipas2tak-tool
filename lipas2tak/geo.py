@@ -1,8 +1,8 @@
-"""Kevyet geometriatyökalut ilman ulkoisia riippuvuuksia.
+"""Lightweight geometry helpers without external dependencies.
 
-Koordinaatit ovat aina (lon, lat) WGS84:ssä, kuten GeoJSONissa.
-Etäisyydet lasketaan paikallisessa tasoprojektiossa (equirectangular),
-mikä riittää Suomen mittakaavassa muutaman kilometrin matkoille.
+Coordinates are always (lon, lat) in WGS84, as in GeoJSON. Distances are
+computed in a local equirectangular projection, which is accurate enough
+for distances of a few kilometres at Finnish latitudes.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ EARTH_R = 6371008.8
 
 
 def drop_z(coords: Sequence[Sequence[float]]) -> Line:
-    """Pudottaa korkeuden (ja muut ylimääräiset arvot) koordinaateista."""
+    """Drop altitude (and any other extra values) from coordinates."""
     return [(float(c[0]), float(c[1])) for c in coords]
 
 
@@ -32,7 +32,7 @@ def line_length_m(line: Line) -> float:
 
 
 class LocalProjection:
-    """Equirectangular-projektio metreihin annetun leveysasteen ympärillä."""
+    """Equirectangular projection to metres around the given latitude."""
 
     def __init__(self, lat0: float):
         self.kx = math.cos(math.radians(lat0)) * math.pi * EARTH_R / 180.0
@@ -52,7 +52,7 @@ def _seg_dist(p, a, b) -> float:
 
 
 def simplify(line: Line, tolerance_m: float) -> Line:
-    """Douglas–Peucker-yksinkertaistus metritoleranssilla (iteratiivinen)."""
+    """Douglas–Peucker simplification with a tolerance in metres (iterative)."""
     if len(line) < 3 or tolerance_m <= 0:
         return list(line)
     proj = LocalProjection(sum(c[1] for c in line) / len(line))
@@ -75,18 +75,18 @@ def simplify(line: Line, tolerance_m: float) -> Line:
 
 
 def merge_lines(lines: Iterable[Line], snap_m: float = 5.0) -> list[Line]:
-    """Yhdistää päistään toisiinsa liittyvät viivat (linemerge), O(n).
+    """Join lines that connect end to end (linemerge), O(n).
 
-    Päätepisteet, jotka ovat alle `snap_m` metrin päässä toisistaan, katsotaan
-    samaksi solmuksi. Viivat ketjutetaan solmujen läpi, joissa kohtaa täsmälleen
-    kaksi viivanpäätä. Haarautumiskohdissa (>2 päätä) ketju katkeaa, jolloin
-    haarat jäävät omiksi viivoikseen. Suljetut silmukat säilyvät silmukoina.
+    End points closer than `snap_m` metres are treated as the same node. Lines
+    are chained through nodes where exactly two line ends meet. At junctions
+    (>2 ends) the chain stops, so branches stay separate lines. Closed loops
+    are kept as loops.
     """
     parts = [list(l) for l in lines if len(l) >= 2]
     if len(parts) <= 1:
         return parts
 
-    # --- Päätepisteiden solmut (ruudukko + naapuriruudut) ---
+    # --- End-point nodes (grid + neighbouring cells) ---
     lat0 = sum(p[0][1] for p in parts) / len(parts)
     proj = LocalProjection(lat0)
     cell = max(snap_m, 0.5)
@@ -111,7 +111,7 @@ def merge_lines(lines: Iterable[Line], snap_m: float = 5.0) -> list[Line]:
     adj: dict[int, list[int]] = {}
     for i, (_, a, b) in enumerate(edges):
         adj.setdefault(a, []).append(i)
-        adj.setdefault(b, []).append(i)  # silmukka (a == b) lasketaan kahdesti
+        adj.setdefault(b, []).append(i)  # a loop (a == b) is counted twice
 
     used = [False] * len(edges)
 
@@ -134,13 +134,13 @@ def merge_lines(lines: Iterable[Line], snap_m: float = 5.0) -> list[Line]:
         return coords
 
     out: list[Line] = []
-    # Ensin ketjut, jotka alkavat päätepisteestä tai haarautumasta
+    # First the chains that start at an end point or a junction
     for node, es in adj.items():
         if len(es) != 2:
             for e in es:
                 if not used[e]:
                     out.append(walk(e, node))
-    # Jäljelle jäävät ovat suljettuja silmukoita
+    # Whatever remains are closed loops
     for i, (_, a, _) in enumerate(edges):
         if not used[i]:
             out.append(walk(i, a))
@@ -148,7 +148,7 @@ def merge_lines(lines: Iterable[Line], snap_m: float = 5.0) -> list[Line]:
 
 
 def snap_to_line(line: Line, pt: Coord, max_dist_m: float):
-    """Lähin kohta viivalla: (segmentin indeksi, t 0..1, piste viivalla, etäisyys m) tai None."""
+    """Nearest point on the line: (segment index, t 0..1, point on line, distance m) or None."""
     proj = LocalProjection(pt[1])
     p = proj.fwd(pt)
     best = None
@@ -168,18 +168,17 @@ def snap_to_line(line: Line, pt: Coord, max_dist_m: float):
 
 
 class GridIndex:
-    """Yksinkertainen ruudukkoindeksi lähipistehakuun.
+    """Simple grid index for nearby-point queries.
 
-    `near()` palauttaa pisteet viereisistä ruuduista; solukoko asteina.
-    Oletus 0.01° ≈ 1.1 km (lat) / 0.55 km (lon Suomessa), mikä riittää
-    alle ~500 m hakusäteille.
+    `near()` yields the points in the neighbouring cells; cell size is in
+    degrees. Use `for_radius()` to get a cell size that covers a search radius.
     """
 
     def __init__(self, cell_deg: float = 0.01):
         self.cell = cell_deg
         self.cells: dict[tuple[int, int], list] = {}
 
-    # Pituusasteruutu on 3x leveämpi: kattaa hakusäteen koko Suomessa (cos 70° ≈ 0.34)
+    # Longitude cells are 3x wider so the radius is covered all over Finland (cos 70° ≈ 0.34)
     LON_FACTOR = 3
 
     @classmethod
@@ -199,7 +198,7 @@ class GridIndex:
                 yield from self.cells.get((kx + dx, ky + dy), ())
 
 
-# --- Polygonit -----------------------------------------------------------
+# --- Polygons --------------------------------------------------------------
 
 def _ring_contains(ring: Line, pt: Coord) -> bool:
     x, y = pt
@@ -218,11 +217,11 @@ def _ring_contains(ring: Line, pt: Coord) -> bool:
 
 
 class Area:
-    """(Multi)Polygon-alue: sisältyvyys- ja puskuritestit bbox-esisuodatuksella.
+    """(Multi)Polygon area: containment and buffer tests with bbox pre-filtering.
 
-    Suuret saaristoalueet (tuhansia polygoneja ja satojatuhansia solmuja)
-    vaativat esisuodatusta: polygoneilla ja reunapaloilla (BLOCK solmua)
-    on omat bboxinsa, joten vain lähellä olevat reunat tarkistetaan.
+    Large archipelago areas (thousands of polygons, hundreds of thousands of
+    vertices) need pre-filtering: polygons and edge blocks (BLOCK vertices)
+    have their own bboxes, so only nearby edges are checked.
     """
 
     BLOCK = 64
@@ -234,13 +233,13 @@ class Area:
         elif t == "MultiPolygon":
             polys = geometry["coordinates"]
         else:
-            raise ValueError(f"Ei aluegeometria: {t}")
+            raise ValueError(f"Not an area geometry: {t}")
         self.polygons: list[list[Line]] = [[drop_z(r) for r in p] for p in polys]
         self.poly_bboxes = [_bbox(p[0]) for p in self.polygons]
         xs = [b[0] for b in self.poly_bboxes] + [b[2] for b in self.poly_bboxes]
         ys = [b[1] for b in self.poly_bboxes] + [b[3] for b in self.poly_bboxes]
         self.bbox = (min(xs), min(ys), max(xs), max(ys))
-        # Reunapalat: (bbox, solmut), peräkkäiset palat jakavat päätesolmun
+        # Edge blocks: (bbox, vertices); consecutive blocks share an end vertex
         self.blocks: list[tuple[tuple[float, float, float, float], Line]] = []
         for poly in self.polygons:
             for ring in poly:
@@ -268,7 +267,7 @@ class Area:
         return False
 
     def _edge_distance(self, pt: Coord, limit_m: float) -> float:
-        """Lyhin etäisyys reunaan, tarkistaen vain `limit_m` säteen palat."""
+        """Shortest distance to the boundary, checking only blocks within `limit_m`."""
         mx, my = self._margins(pt[1], limit_m)
         proj = LocalProjection(pt[1])
         p = proj.fwd(pt)
@@ -286,7 +285,7 @@ class Area:
         return best
 
     def distance_m(self, pt: Coord, limit_m: float = 50_000.0) -> float:
-        """Etäisyys alueen reunaan metreinä (0 sisällä, inf jos yli `limit_m`)."""
+        """Distance to the area boundary in metres (0 inside, inf beyond `limit_m`)."""
         if self.contains(pt):
             return 0.0
         return self._edge_distance(pt, limit_m)
@@ -303,7 +302,7 @@ class Area:
         return any(self.within(c, buffer_m) for c in line)
 
     def length_within_m(self, line: Line, buffer_m: float = 0.0) -> tuple[float, float]:
-        """(alueella oleva pituus, kokonaispituus) metreinä solmujen perusteella."""
+        """(length inside the area, total length) in metres, based on vertices."""
         inside = [self.within(c, buffer_m) for c in line]
         tot = ins = 0.0
         for i in range(len(line) - 1):
@@ -321,7 +320,7 @@ def _bbox(pts: Line) -> tuple[float, float, float, float]:
 
 
 def representative_point(geometry: dict) -> Coord:
-    """Edustava piste: piste itse tai viivan keskimmäinen solmu."""
+    """Representative point: the point itself or the middle vertex of a line."""
     t = geometry["type"]
     c = geometry["coordinates"]
     if t == "Point":

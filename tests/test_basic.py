@@ -1,4 +1,4 @@
-"""Testit: python -m unittest discover -s tests  (toimii myös pytestillä)."""
+"""Tests: python -m unittest discover -s tests  (also works with pytest)."""
 from __future__ import annotations
 
 import json
@@ -29,7 +29,7 @@ class GeoTests(unittest.TestCase):
 
     def test_merge_lines_joins_pieces(self):
         a = [(24.0, 60.0), (24.01, 60.0)]
-        b = [(24.02, 60.0), (24.01, 60.0)]  # vastakkaiseen suuntaan
+        b = [(24.02, 60.0), (24.01, 60.0)]  # opposite direction
         merged = geo.merge_lines([a, b])
         self.assertEqual(len(merged), 1)
         self.assertEqual(len(merged[0]), 3)
@@ -64,8 +64,8 @@ class GeoTests(unittest.TestCase):
               "telttapaikka": "telttailu", "nakotorni": "nakotornit"}
         waypoints.attach_waypoints(feats, kg, ["suojat", "tulentekopaikat", "telttailu", "nakotornit"],
                                    radius_m=75, cluster_m=200)
-        self.assertEqual(len(route.waypoints), 2)                   # ryväs + torni
-        self.assertEqual(route.waypoints[0][1][0].uid, "laavu")     # suoja on ryppään edustaja
+        self.assertEqual(len(route.waypoints), 2)                   # cluster + tower
+        self.assertEqual(route.waypoints[0][1][0].uid, "laavu")     # the shelter represents the cluster
         self.assertEqual({f.uid for f in route.waypoints[0][1]}, {"laavu", "nuotio", "teltta"})
 
     def test_merge_lines_loop(self):
@@ -79,14 +79,14 @@ class GeoTests(unittest.TestCase):
         sq = {"type": "Polygon", "coordinates": [[[24, 60], [25, 60], [25, 61], [24, 61], [24, 60]]]}
         a = geo.Area(sq)
         self.assertTrue(a.within((24.5, 60.5)))
-        outside = (25.005, 60.5)  # ~280 m itään
+        outside = (25.005, 60.5)  # ~280 m east
         self.assertFalse(a.within(outside))
         self.assertTrue(a.within(outside, buffer_m=500))
 
 
 class FormatTests(unittest.TestCase):
     def test_argb_matches_atak_example(self):
-        # ATAKin esimerkkireitin väri -8454017 = 0xFF7F007F
+        # colour of the ATAK example route -8454017 = 0xFF7F007F
         self.assertEqual(cot.argb_int("#7F007F"), -8454017)
         self.assertEqual(cot.argb_int("#FFFFFF"), -1)
 
@@ -143,31 +143,34 @@ class PipelineTests(unittest.TestCase):
         keys = {(e["key"], e["lang"]) for e in idx["areas"]}
         self.assertIn(("kansallispuistot/nuuksio", "fi"), keys)
         self.assertIn(("maakunnat/uusimaa", "en"), keys)
-        self.assertIn(("maakunnat/kanta-hame", "fi"), keys)  # akselijärjestys korjattu
+        self.assertIn(("maakunnat/kanta-hame", "fi"), keys)  # axis order fixed
 
         park = next(e for e in idx["areas"] if e["key"] == "kansallispuistot/nuuksio" and e["lang"] == "fi")
         uids = set(park["uids"])
-        self.assertIn("lipas-900020", uids)          # Haukankierros yhdistetty yhdeksi viivaksi
+        self.assertIn("lipas-900020", uids)          # Haukankierros merged into one line
         with zipfile.ZipFile(out / park["files"]["datapackage"]) as z:
             r = ET.fromstring(z.read("lipas-900020/lipas-900020.cot"))
-        self.assertEqual(r.get("type"), "b-m-r")      # reitit navigoitavina reitteinä
+        self.assertEqual(r.get("type"), "b-m-r")      # routes as navigable routes
         named = [l.get("callsign") for l in r.findall("detail/link") if l.get("type") == "b-m-p-w"]
-        self.assertIn("Kolmoislammen laavu", named)   # taukopaikka (OSM) reitin varrella reittipisteenä
+        self.assertIn("Kolmoislammen laavu", named)   # rest stop (OSM) along the route as a waypoint
         self.assertTrue(named[0].endswith("alku") and named[-1].endswith("loppu"))
-        self.assertNotIn("lipas-900008", uids)       # Testilaavu suodatettu
-        self.assertIn("osm-n1002", uids)             # OSM-käymälä retkikohteen lähellä
-        self.assertNotIn("osm-n1001", uids)          # duplikaatti LOI-käymälän kanssa
-        self.assertFalse(any(u.startswith("osm-w2001") for u in uids))  # Helsingin WC pois
+        self.assertNotIn("lipas-900008", uids)       # Testilaavu filtered out
+        self.assertIn("osm-n1002", uids)             # OSM toilet near an outdoor site
+        self.assertNotIn("osm-n1001", uids)          # duplicate of the LOI toilet
+        self.assertFalse(any(u.startswith("osm-w2001") for u in uids))  # Helsinki WC excluded
         self.assertEqual(park["counts"]["kota"], 1)
-        self.assertIn("osm-n3002", uids)             # OSM-laavu, jota ei ole Lipaksessa
-        self.assertNotIn("osm-n3001", uids)          # sama laavu kuin Lipaksessa
-        self.assertNotIn("osm-n3003", uids)          # ei retkikohteiden lähellä
+        self.assertIn("osm-n3002", uids)             # OSM lean-to missing from Lipas
+        self.assertNotIn("osm-n3001", uids)          # same lean-to as in Lipas
+        self.assertNotIn("osm-n3003", uids)          # not near outdoor sites
 
-        # Datapaketti: manifest + CoT parsittavissa, hashtagit remarksissa
+        # Data package: manifest + CoT parse, hashtags in remarks
         dp = out / park["files"]["datapackage"]
         with zipfile.ZipFile(dp) as z:
-            ET.fromstring(z.read("MANIFEST/manifest.xml"))
+            man = ET.fromstring(z.read("MANIFEST/manifest.xml"))
             ev = ET.fromstring(z.read("lipas-900001/lipas-900001.cot"))
+            self.assertIn("OpenStreetMap", z.read("ATTRIBUTION.txt").decode())
+        att = man.find("Contents/Content[@zipEntry='ATTRIBUTION.txt']")
+        self.assertEqual(att.get("ignore"), "true")
         rem = ev.find("detail/remarks").text
         self.assertIn("#laavu", rem)
         self.assertIn("#nuuksio", rem)
@@ -176,22 +179,24 @@ class PipelineTests(unittest.TestCase):
         icon = ev.find("detail/usericon").get("iconsetpath")
         self.assertTrue(icon.endswith("/Retkeily/laavu.png"))
 
-        # KMZ: doc.kml parsittavissa ja kuvakkeet mukana
+        # KMZ: doc.kml parses and icons are included
         with zipfile.ZipFile(out / park["files"]["kmz"]) as z:
             ET.fromstring(z.read("doc.kml"))
             self.assertIn("files/laavu.png", z.namelist())
 
-        # GPX ilman korkeutta
+        # GPX without elevation
         with zipfile.ZipFile(out / park["files"]["gpx_zip"]) as z:
-            g = z.read(z.namelist()[0]).decode()
+            g = z.read(next(n for n in z.namelist() if n.endswith(".gpx"))).decode()
+            self.assertIn("ATTRIBUTION.txt", z.namelist())
         self.assertNotIn("<ele>", g)
+        self.assertIn("<copyright", g)
         ET.fromstring(g)
 
     def test_change_detection(self):
         self.run_once()
         res = self.run_once()
         self.assertEqual(res["changes"], {})
-        # poistetaan yksi kohde -> näkyy poistona
+        # remove one feature -> shows up as a deletion
         self.raw.sites = [s for s in self.raw.sites if s["lipas-id"] != 900002]
         res = self.run_once()
         self.assertIn("lipas-900002", res["changes"]["kansallispuistot/nuuksio/fi"]["removed"])

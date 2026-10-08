@@ -1,5 +1,5 @@
-# Kehityskäyttöön. Tuotantopino (ajastus, nginx, feederit) on repossa
-# docker-lipas-integration.
+# For development. The production stack (scheduling, nginx, feeders) lives in
+# the docker-lipas-integration repository.
 services:
   lipas2tak:
     build: .

@@ -1,8 +1,7 @@
-"""CoT-XML: merkit (a-u-G + usericon) ja reittiviivat (u-d-f).
+"""CoT XML: markers (a-u-G + usericon), routes (b-m-r) and drawn lines (u-d-f).
 
-Rakenne on johdettu ATAK 5.8:lla tehdystä esimerkkidatapaketista
-(docs/atak-esimerkit/). Korkeutta ei kirjoiteta: ATAK sitoo kohteet
-omaan korkeusmalliinsa (päätös 7.10.2026).
+The structure is derived from data packages exported by ATAK 5.8. Altitude is
+not written: ATAK clamps the items to its own elevation model.
 """
 from __future__ import annotations
 
@@ -15,7 +14,7 @@ HAE_UNKNOWN = "9999999.0"
 
 
 def argb_int(hex_rgb: str, alpha: int = 255) -> int:
-    """'#RRGGBB' -> ATAKin etumerkillinen ARGB-kokonaisluku."""
+    """'#RRGGBB' -> ATAK's signed ARGB integer."""
     h = hex_rgb.lstrip("#")
     v = (alpha << 24) | int(h, 16)
     return v - (1 << 32) if v >= (1 << 31) else v
@@ -53,7 +52,7 @@ def marker(uid: str, cot_type: str, lat: float, lon: float, callsign: str, remar
 def polyline(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
              stroke_weight: float = 4.0, now: datetime | None = None, stale_days: int = 365,
              link_hae: bool = False) -> str:
-    """Reittiviiva (u-d-f). `line` on [(lon, lat), ...]."""
+    """Drawn line (u-d-f). `line` is [(lon, lat), ...]."""
     now = now or datetime.now(timezone.utc)
     argb = argb_int(color_hex)
     suffix = f",{HAE_UNKNOWN}" if link_hae else ""
@@ -67,7 +66,7 @@ def polyline(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
         f"<detail>{links}"
         f"<strokeColor value='{argb}'/><strokeWeight value='{stroke_weight:.1f}'/>"
         "<strokeStyle value='solid'/>"
-        # Läpinäkyvä täyttö: muuten ATAK täyttää umpinaiset (silmukka-)reitit
+        # Transparent fill: otherwise ATAK fills closed (loop) lines
         "<fillColor value='0'/>"
         f"<contact callsign={quoteattr(callsign)}/>"
         f"<remarks>{escape(remarks)}</remarks>"
@@ -81,17 +80,16 @@ def route(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
           method: str = "Walking", route_kind: str = "On Foot",
           now: datetime | None = None, stale_days: int = 365,
           waypoints: dict[int, tuple[str, str]] | None = None) -> str:
-    """Navigoitava ATAK-reitti (b-m-r).
+    """Navigable ATAK route (b-m-r).
 
-    `waypoints`: {solmuindeksi: (nimi, kuvaus)} – reitin varren taukopaikat
-    nimettyinä reittipisteinä (b-m-p-w), joihin ATAKin navigointi viittaa.
+    `waypoints`: {vertex index: (name, description)} – rest stops along the
+    route as named waypoints (b-m-p-w) that ATAK navigation refers to.
 
-    Rakenne on kopioitu ATAK 5.8:n omasta viennistä (Iivaara-esimerkki):
-    reitin oma piste on 0,0; reittipisteet ovat <link>-elementtejä, joista
-    ensimmäinen ja viimeinen ovat nimettyjä reittipisteitä (b-m-p-w) ja
-    välissä tarkistuspisteitä (b-m-p-c). Navigointiohjeet ATAK laskee itse.
-    Pisteiden UID:t ovat deterministisiä (`<uid>-p<n>`), jotta päivitys
-    korvaa vanhan reitin.
+    The structure mirrors ATAK 5.8's own export: the route's own point is 0,0;
+    route points are <link> elements, the first and last being named waypoints
+    (b-m-p-w) and the rest check points (b-m-p-c). ATAK computes navigation cues
+    itself. Point UIDs are deterministic (`<uid>-p<n>`) so an update replaces
+    the previous route.
     """
     now = now or datetime.now(timezone.utc)
     argb = argb_int(color_hex)

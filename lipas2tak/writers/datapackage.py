@@ -1,10 +1,10 @@
-"""ATAK Mission Package v2 (datapaketti, .zip).
+"""ATAK Mission Package v2 (data package, .zip).
 
-Rakenne (ATAKin oma vienti):
+Layout (as exported by ATAK):
     MANIFEST/manifest.xml
     <uid>/<uid>.cot
-Paketin UID on deterministinen (uuid5 nimestä), joten uusi versio
-korvaa vanhan ATAKissa eikä synny rinnakkaisia paketteja.
+The package UID is deterministic (uuid5 of the name), so a new version
+replaces the old one in ATAK instead of creating parallel packages.
 """
 from __future__ import annotations
 
@@ -21,8 +21,13 @@ def package_uid(key: str) -> str:
 
 
 def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
-          extra_files: list[tuple[str, bytes]] | None = None) -> None:
-    """items: [(uid, nimi, cot_xml)], extra_files: [(zip-polku, sisältö)]"""
+          extra_files: list[tuple[str, bytes]] | None = None,
+          remarks: str = "", notice: str = "") -> None:
+    """items: [(uid, name, cot_xml)], extra_files: [(zip path, content)].
+
+    `remarks` is shown with the package in ATAK; `notice` is stored as
+    ATTRIBUTION.txt, which ATAK does not import (ignore="true").
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     contents = []
     for uid, title, _ in items:
@@ -34,6 +39,9 @@ def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
         )
     for zpath, _ in extra_files or []:
         contents.append(f'      <Content ignore="false" zipEntry={quoteattr(zpath)}/>')
+    if notice:
+        contents.append('      <Content ignore="true" zipEntry="ATTRIBUTION.txt"/>')
+    remarks_param = f'      <Parameter name="remarks" value={quoteattr(remarks)}/>\n' if remarks else ""
     manifest = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<MissionPackageManifest version="2">\n'
@@ -41,6 +49,7 @@ def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
         f'      <Parameter name="uid" value="{package_uid(key)}"/>\n'
         f"      <Parameter name=\"name\" value={quoteattr(name)}/>\n"
         '      <Parameter name="onReceiveDelete" value="true"/>\n'
+        + remarks_param +
         "   </Configuration>\n"
         "   <Contents>\n" + "\n".join(contents) + "\n   </Contents>\n"
         "</MissionPackageManifest>\n"
@@ -52,4 +61,6 @@ def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
             z.writestr(f"{uid}/{uid}.cot", xml)
         for zpath, data in extra_files or []:
             z.writestr(zpath, data)
+        if notice:
+            z.writestr("ATTRIBUTION.txt", notice)
     tmp.replace(path)

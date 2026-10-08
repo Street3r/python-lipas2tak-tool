@@ -5,8 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "lipas2tak"
 version = "0.1.0"
-description = "Lipas-retkeilykohteet TAK-käyttöön: CoT-datapaketit, KMZ, KML-verkkolinkit ja GPX"
+description = "Finnish outdoor recreation data (Lipas, OpenStreetMap) for TAK: CoT data packages, KMZ, KML network links and GPX"
 readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Street3r" }]
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",

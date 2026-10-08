@@ -1,18 +1,18 @@
-# python-lipas2tak-tool – pääasetukset
-# Arvot voi ylikirjoittaa ympäristömuuttujilla, ks. README.
+# python-lipas2tak-tool – main settings
+# Values can be overridden with environment variables, see README.
 
 languages: [fi, en]
 
-# Julkinen osoite, josta KMZ-tiedostot ja datapaketit jaetaan.
-# Käytetään KML-verkkolinkeissä (NetworkLink) ja index.html-sivulla.
+# Public base URL where the KMZ files and data packages are served.
+# Used in KML network links (NetworkLink) and on the index.html page.
 public_base_url: "https://example.org/lipas2tak"   # env: LIPAS2TAK_PUBLIC_BASE_URL
 
 paths:
-  cache: data/cache        # raakadata ja välimuisti
-  output: data/output      # julkaistavat tiedostot (nginx tarjoilee tämän)
-  # Kuvakesarja. Oletus on oma kuvasymbolisarja. Pilotissa voi käyttää omia
-  # kuvakkeita (esim. Luontoon.fi) asettamalla LIPAS2TAK_ICONS_DIR; puuttuvat
-  # kuvakkeet haetaan icons_fallback-kansiosta. Ks. icons/README.md.
+  cache: data/cache        # raw data and cache
+  output: data/output      # published files (served by nginx)
+  # Icon set. Default is the project's own pictogram set. A custom set can be
+  # used by setting LIPAS2TAK_ICONS_DIR; missing icons are taken from
+  # icons_fallback. See icons/README.md.
   icons: icons/retkeily              # env: LIPAS2TAK_ICONS_DIR
   icons_fallback: icons/retkeily
 
@@ -21,34 +21,34 @@ sources:
     base_url: "https://api.lipas.fi/v2"
     page_size: 100
     statuses: [active, out-of-service-temporarily]
-    request_delay_s: 0.3   # kohteliaisuusviive pyyntöjen välissä
-    cache_max_age_h: 20    # yhden ajon aikana ei haeta samaa uudestaan
+    request_delay_s: 0.3   # politeness delay between requests
+    cache_max_age_h: 20    # do not re-fetch the same data within one run
   lois:
     enabled: true
     statuses: [active]
   osm:
     enabled: true
     overpass_url: "https://overpass-api.de/api/interpreter"
-    # OSM-käymälöistä otetaan vain ne, jotka ovat lähellä muita retkikohteita
-    # tai reittejä (kaupunkien yleiset WC:t jäävät pois).
+    # Default OSM filters (overridable per kind in types.yaml): only features
+    # near other outdoor features or routes are included (urban toilets are left out).
     context_radius_m: 300
-    # Jos Lipaksessa/LOI:ssa on käymälä näin lähellä, OSM-kohde ohitetaan.
+    # If Lipas/LOI has a feature of the same group this close, the OSM feature is skipped.
     dedupe_radius_m: 40
   regions:
-    # Tilastokeskuksen maakuntarajat (CC BY 4.0)
+    # Statistics Finland regional boundaries (CC BY 4.0)
     wfs_url: "https://geo.stat.fi/geoserver/tilastointialueet/wfs"
     layer: "tilastointialueet:maakunta1000k"
 
-# Testi-/virhedatan suodatus nimen perusteella
+# Filter out test/erroneous data by name
 exclude_name_regex: "(?i)\\btesti|testauskohde|testikohde"
 
 areas:
-  # Järjestys = toteutusjärjestys (päätös 3). Vain enabled: true tuotetaan.
+  # Only areas with enabled: true are produced.
   kansallispuistot:
     enabled: true
     lipas_type_codes: [111]
     label: {fi: Kansallispuisto, en: National park}
-    buffer_m: 500          # reunan pysäköinti- ja opastuspisteet mukaan
+    buffer_m: 500          # include parking and info points at the edge
     strip_from_name: "(?i)\\s*kansallispuisto$"
   eramaat:
     enabled: false
@@ -58,36 +58,36 @@ areas:
     strip_from_name: "(?i)\\s*erämaa(-alue)?$"
   valtion_retkeilyalueet:
     enabled: false
-    lipas_type_codes: []   # TODO: tyyppikoodi/tietolähde selvitettävä
+    lipas_type_codes: []   # TODO: type code / data source to be determined
     label: {fi: Valtion retkeilyalue, en: State hiking area}
     buffer_m: 500
   maakunnat:
     enabled: true
 
 routes:
-  # CoT-muoto: route = navigoitava ATAK-reitti (b-m-r), shape = piirretty viiva (u-d-f)
+  # CoT format: route = navigable ATAK route (b-m-r), shape = drawn line (u-d-f)
   cot_format: route
   simplify_tolerance_m: 5.0   # Douglas–Peucker
-  merge_snap_m: 5.0           # palojen yhdistäminen
+  merge_snap_m: 5.0           # joining of route parts
   stroke_weight: 4.0
-  # Alueen (puiston) pakettiin otetaan reittipala, jos alueella kulkee
-  # vähintään tämä osuus sen pituudesta tai vähintään area_min_inside_m metriä.
+  # A route part is included in an area (park) package if at least this share
+  # of its length, or at least area_min_inside_m metres, lies inside the area.
   area_min_share: 0.3
   area_min_inside_m: 3000
-  # Reitin varren taukopaikat nimettyinä reittipisteinä (ATAK-navigointi, GPX)
+  # Rest stops along routes as named waypoints (ATAK navigation, GPX)
   waypoints:
     enabled: true
-    radius_m: 75              # kohde enintään näin kaukana reittiviivasta
-    cluster_m: 200            # tätä lähempänä toisiaan olevat kohteet = yksi reittipiste
+    radius_m: 75              # max distance of a feature from the route line
+    cluster_m: 200            # features closer than this to each other = one waypoint
     groups: [suojat, tulentekopaikat, telttailu, nakotornit]
 
 remarks:
-  max_text_chars: 500         # ennen hashtageja
+  max_text_chars: 500         # before hashtags
 
 outputs:
   datapackage: true
   kmz: true
-  kmz_per_group: true         # erilliset tyyppikohtaiset KMZ:t (laavut/nuotiot/...)
+  kmz_per_group: true         # separate KMZ per group (shelters / campfire sites / ...)
   network_link: true
   gpx: true
   network_link_refresh_s: 86400

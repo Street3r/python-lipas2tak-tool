@@ -1,4 +1,4 @@
-"""KMZ (doc.kml + kuvakkeet) ja KML-verkkolinkki (NetworkLink)."""
+"""KMZ (doc.kml + icons) and KML network link (NetworkLink)."""
 from __future__ import annotations
 
 import zipfile
@@ -6,11 +6,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from xml.sax.saxutils import escape, quoteattr
 
+from .. import attribution
 from ..geo import Coord, Line
 
 
 def kml_color(hex_rgb: str, alpha: int = 255) -> str:
-    """'#RRGGBB' -> KML:n aabbggrr."""
+    """'#RRGGBB' -> KML aabbggrr."""
     h = hex_rgb.lstrip("#")
     r, g, b = h[0:2], h[2:4], h[4:6]
     return f"{alpha:02x}{b}{g}{r}".lower()
@@ -54,7 +55,7 @@ def _placemark(p: Placemark) -> str:
 
 def write_kmz(path: Path, name: str, folders: list[Folder], icon_styles: dict[str, str],
               line_styles: dict[str, tuple[str, float]], icons_dir) -> None:
-    """icon_styles: {style_id: kuvaketiedosto}, line_styles: {style_id: (#RRGGBB, leveys)}"""
+    """icon_styles: {style_id: icon file}, line_styles: {style_id: (#RRGGBB, width)}"""
     styles = []
     used_icons = set()
     for sid, icon in icon_styles.items():
@@ -70,7 +71,8 @@ def write_kmz(path: Path, name: str, folders: list[Folder], icon_styles: dict[st
     )
     doc = ('<?xml version="1.0" encoding="UTF-8"?>\n'
            '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
-           f"<name>{escape(name)}</name>{''.join(styles)}{body}</Document></kml>\n")
+           f"<name>{escape(name)}</name><description>{escape(attribution.SHORT)}</description>"
+           f"{''.join(styles)}{body}</Document></kml>\n")
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
@@ -94,7 +96,7 @@ def write_network_link(path: Path, name: str, href: str, refresh_s: int) -> None
 
 
 def _find(dirs, name: str) -> Path:
-    """Ensimmäinen kansio, josta kuvake löytyy (Path tai lista Patheja)."""
+    """First directory containing the icon (a Path or a list of Paths)."""
     for d in (dirs if isinstance(dirs, (list, tuple)) else [dirs]):
         if (Path(d) / name).exists():
             return Path(d) / name

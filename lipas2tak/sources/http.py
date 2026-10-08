@@ -1,4 +1,4 @@
-"""HTTP-haku levyvälimuistilla ja uudelleenyrityksillä."""
+"""HTTP fetching with an on-disk cache and retries."""
 from __future__ import annotations
 
 import hashlib
@@ -57,7 +57,7 @@ class CachedClient:
             except (requests.RequestException, ValueError) as e:
                 last_err = e
                 backoff = 2 ** attempt * 2
-                log.warning("Haku epäonnistui (%s), yritys %d/%d, odotetaan %ss: %s",
+                log.warning("Request failed (%s), attempt %d/%d, waiting %ss: %s",
                             url, attempt + 1, self.retries, backoff, e)
                 time.sleep(backoff)
-        raise RuntimeError(f"Haku epäonnistui: {url}") from last_err
+        raise RuntimeError(f"Request failed: {url}") from last_err

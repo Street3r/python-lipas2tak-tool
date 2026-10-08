@@ -1,8 +1,8 @@
-"""Synteettinen, Lipaksen rakennetta jäljittelevä Nuuksio-testiaineisto.
+"""Synthetic Nuuksio test data mimicking the Lipas data structure.
 
-Koordinaatit ja nimet ovat suuntaa-antavia, EIVÄT oikeaa dataa. Rakenne
-(kenttien nimet, sisäkkäisyys) on otettu Lipaksen v2-rajapinnan vastauksista.
-Ajo: python tests/fixtures/make_nuuksio.py  -> tests/fixtures/nuuksio/*.json
+Coordinates and names are approximate and NOT real data. The structure
+(field names, nesting) is taken from Lipas v2 API responses.
+Run: python tests/fixtures/make_nuuksio.py  -> tests/fixtures/nuuksio/*.json
 """
 import json
 from pathlib import Path
@@ -41,7 +41,7 @@ sites = [
     site(900006, 202, "Mustalammen telttailualue", 24.4880, 60.3160, {"toilet?": True}),
     site(900007, 207, "Haukkalammen opastuspiste", 24.5040, 60.3090, {"parking-place?": True, "toilet?": True},
          www="https://www.luontoon.fi/nuuksio"),
-    site(900008, 301, "Testilaavu", 24.5000, 60.3000, {}),  # suodatetaan nimen perusteella
+    site(900008, 301, "Testilaavu", 24.5000, 60.3000, {}),  # filtered out by name
     site(900009, 301, "Aulangon laavu", 24.4600, 61.0100, {}, admin="city-sports", city=109),
     site(900010, 302, "Kaitalammen tupa", 24.4950, 60.2950, {}, status="out-of-service-temporarily"),
 ]
@@ -49,7 +49,7 @@ for s in sites:
     s.pop("name_localized", None)
 sites[1]["name-localized"] = {"se": "Mustalammens kåta", "en": "Mustalampi hut"}
 
-# Reitti kahdessa palassa + korkeus (Z), Luontoon.fi-rikastus activities-kentässä
+# Route in two pieces + elevation (Z), Luontoon.fi enrichment in the activities field
 hauk1 = [[24.5040, 60.3090, 40.0], [24.5000, 60.3110, 42.0], [24.4950, 60.3120, 44.0], [24.4920, 60.3140, 46.1]]
 hauk2 = [[24.4920, 60.3140, 46.1], [24.4950, 60.3160, 45.0], [24.5010, 60.3150, 43.0], [24.5040, 60.3090, 40.0]]
 sites.append({
@@ -94,11 +94,11 @@ lois = [
 ]
 
 osm = {"laavu": [
-    {"type": "node", "id": 3001, "lat": 60.30850, "lon": 24.50600, "tags": {"amenity": "shelter", "shelter_type": "lean_to", "name": "Haukkalammen laavu"}},  # Lipaksessa jo
-    {"type": "node", "id": 3002, "lat": 60.3135, "lon": 24.4935, "tags": {"amenity": "shelter", "shelter_type": "lean_to", "name": "Kolmoislammen laavu"}},  # uusi, reitin varrella
-    {"type": "node", "id": 3003, "lat": 60.5000, "lon": 25.5000, "tags": {"amenity": "shelter", "shelter_type": "lean_to"}},  # kaukana kaikesta
+    {"type": "node", "id": 3001, "lat": 60.30850, "lon": 24.50600, "tags": {"amenity": "shelter", "shelter_type": "lean_to", "name": "Haukkalammen laavu"}},  # already in Lipas
+    {"type": "node", "id": 3002, "lat": 60.3135, "lon": 24.4935, "tags": {"amenity": "shelter", "shelter_type": "lean_to", "name": "Kolmoislammen laavu"}},  # new, along the route
+    {"type": "node", "id": 3003, "lat": 60.5000, "lon": 25.5000, "tags": {"amenity": "shelter", "shelter_type": "lean_to"}},  # far from everything
 ], "kaymala": [
-    {"type": "node", "id": 1001, "lat": 60.30852, "lon": 24.50555, "tags": {"amenity": "toilets"}},  # duplikaatti
+    {"type": "node", "id": 1001, "lat": 60.30852, "lon": 24.50555, "tags": {"amenity": "toilets"}},  # duplicate
     {"type": "node", "id": 1002, "lat": 60.3172, "lon": 24.4870, "tags": {"amenity": "toilets", "name": "Mustalammen huussi"}},
     {"type": "way", "id": 2001, "center": {"lat": 60.1699, "lon": 24.9384}, "tags": {"amenity": "toilets"}},  # Helsinki
 ]}
@@ -115,7 +115,7 @@ regions = [
     {"type": "Feature", "properties": {"maakunta": "01", "nimi": "Uusimaa", "name": "Uusimaa"},
      "geometry": {"type": "Polygon", "coordinates": [[[22.8, 59.8], [26.5, 59.8], [26.5, 60.85], [22.8, 60.85], [22.8, 59.8]]]}},
     {"type": "Feature", "properties": {"maakunta": "05", "nimi": "Kanta-Häme", "name": "Kanta-Häme"},
-     # lat/lon-järjestyksessä tahallaan: testaa akselien korjauksen
+     # deliberately in lat/lon order: tests the axis-order fix
      "geometry": {"type": "Polygon", "coordinates": [[[60.85, 23.5], [60.85, 25.2], [61.3, 25.2], [61.3, 23.5], [60.85, 23.5]]]}},
 ]
 

@@ -1,30 +1,32 @@
 # python-lipas2tak-tool
 
-Hakee retkeilykohteet ja reitit [Lipaksesta](https://lipas.fi) (sekä täydentävästi OpenStreetMapista) ja tuottaa niistä TAK-käyttöön sopivat tiedostot. Tiedostot tehdään sekä kansallispuisto- että maakuntakohtaisesti, suomeksi ja englanniksi.
+Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipas.fi) (supplemented with OpenStreetMap) and turns them into files for TAK clients (ATAK, WinTAK, iTAK). Output is produced per national park and per region (maakunta), in Finnish and in English.
 
-| Tuotos | Käyttö |
+| Output | Use |
 |---|---|
-| Datapaketti `*.zip` (CoT-merkit + reittiviivat) | ATAK/WinTAK ilman serveriä tai Data Sync -feederin lähteenä |
-| `*.kmz` (kaikki kohteet, kansio per tyyppi) | tuonti tai KML-verkkolinkin kohde |
-| `*_<ryhmä>.kmz` | tyyppikohtaiset tasot (laavut/kodat/tuvat, nuotiopaikat, näkötornit …) |
-| `*.kml` (NetworkLink) | päivittyvä linkki KMZ-tiedostoon |
-| `*_gpx.zip` (`<rte>`) | reitit, jotka ATAK muuntaa navigoitaviksi |
-| `iconset/lipas2tak_iconset.zip` | kuvakesarja, asennetaan kerran |
-| `index.json` / `index.html` | tuotosluettelo feedereille ja ihmisille |
+| Data package `*.zip` (CoT markers + routes) | ATAK/WinTAK without a server, or as a source for a Data Sync feeder |
+| `*.kmz` (all features, one folder per type) | import, or target of a KML network link |
+| `*_<group>.kmz` | per-group layers (shelters, campfire sites, towers …) |
+| `*.kml` (NetworkLink) | auto-refreshing link to the KMZ |
+| `*_gpx.zip` (`<rte>`) | routes that ATAK converts into navigable routes |
+| `iconset/lipas2tak_iconset.zip` | icon set, installed once |
+| `index.json` / `index.html` | catalogue of outputs for feeders and people |
 
-Merkkien `remarks`-kentässä on kuvaus, palvelut ja hashtagit (`#laavu #nuuksio #uusimaa`), joilla näkymää voi rajata ATAKissa. Reittien remarksissa on pituus, maastomerkintä, esteettömyys ja kuvaus.
+Routes are navigable ATAK routes (`b-m-r`); rest stops along a route are named waypoints. Marker `remarks` contain a description, services and hashtags (`#laavu #nuuksio #uusimaa`) that can be used to filter the view in ATAK. Route remarks contain length, trail marking, accessibility and a description.
 
-Ajastus, tiedostojen jakelu (nginx) ja TAK Server -feederit ovat repossa **docker-lipas-integration**.
+The generated content (remarks, hashtags, folder and file names such as `kansallispuistot/nuuksio`) is in Finnish, with English remarks in the `en` outputs.
 
-## Käyttö
+Scheduling, file distribution (nginx) and TAK Server feeders live in [docker-lipas-integration](https://github.com/Street3r/docker-lipas-integration).
+
+## Usage
 
 ```bash
 pip install -e .
-lipas2tak run                      # hae kaikki ja tuota data/output/
-lipas2tak run --only nuuksio       # vain yksi alue (slug tai avain kansallispuistot/nuuksio)
-lipas2tak fetch --dump data/raw    # tallenna raakadata
-lipas2tak build --raw data/raw     # tuota tallennetusta datasta ilman verkkoa
-lipas2tak schedule --every-days 7  # konttikäyttö: ajo heti ja sitten viikoittain
+lipas2tak run                      # fetch everything and write data/output/
+lipas2tak run --only nuuksio       # a single area (slug or key, e.g. kansallispuistot/nuuksio)
+lipas2tak fetch --dump data/raw    # save the raw data
+lipas2tak build --raw data/raw     # build from saved raw data without network access
+lipas2tak schedule --every-days 7  # container mode: run now and then weekly
 ```
 
 Docker:
@@ -34,40 +36,55 @@ docker build -t lipas2tak .
 docker run --rm -v "$PWD/data:/data" -e LIPAS2TAK_PUBLIC_BASE_URL=https://example.org/lipas2tak lipas2tak run
 ```
 
-### Asetukset
+Tests: `python -m unittest discover -s tests`
 
-- `config/config.yaml`: lähteet, alueet, tuotokset, URL. Ympäristömuuttujat: `LIPAS2TAK_PUBLIC_BASE_URL`, `LIPAS2TAK_OUTPUT_DIR`, `LIPAS2TAK_CACHE_DIR`, `LIPAS2TAK_ICONS_DIR`, `LIPAS2TAK_OVERPASS_URL`, `LIPAS2TAK_CONFIG`, `LIPAS2TAK_TYPES`.
-- `config/types.yaml`: kohdetyypit (Lipas-tyyppikoodit, LOI-tyypit, OSM-tagit), kuvakkeet, värit ja hashtagit. Uuden tyypin lisääminen ei vaadi koodimuutoksia.
-- `config/area_names.yaml`: alueiden perusmuotoiset nimet (esim. "Nuuksion" → "Nuuksio").
+### Configuration
 
-### Tulosteen rakenne
+- `config/config.yaml`: sources, areas, outputs, public URL. Environment overrides: `LIPAS2TAK_PUBLIC_BASE_URL`, `LIPAS2TAK_OUTPUT_DIR`, `LIPAS2TAK_CACHE_DIR`, `LIPAS2TAK_ICONS_DIR`, `LIPAS2TAK_OVERPASS_URL`, `LIPAS2TAK_CONFIG`, `LIPAS2TAK_TYPES`.
+- `config/types.yaml`: feature kinds (Lipas type codes, LOI types, OSM tags), icons, colours and hashtags. Adding a kind needs no code changes.
+- `config/area_names.yaml`: base-form area names (e.g. "Nuuksion" → "Nuuksio").
+- Icons: see [icons/README.md](icons/README.md).
+
+### Output layout
 
 ```
 data/output/
   index.json, index.html
   iconset/lipas2tak_iconset.zip
   fi|en/kansallispuistot|maakunnat/<slug>/
-    <slug>_<kieli>.zip            datapaketti
-    <slug>_<kieli>.kmz / .kml      kaikki + verkkolinkki
-    <slug>_<kieli>_<ryhmä>.kmz/.kml
-    <slug>_<kieli>_gpx.zip
+    <slug>_<lang>.zip               data package
+    <slug>_<lang>.kmz / .kml         all features + network link
+    <slug>_<lang>_<group>.kmz/.kml
+    <slug>_<lang>_gpx.zip
 ```
 
-Tiedostot kirjoitetaan ensin väliaikaiseen hakemistoon ja vaihdetaan paikalleen kerralla, joten Lipaksesta poistuneet kohteet katoavat automaattisesti. Muutokset edelliseen ajoon kirjataan tiedostoon `data/cache/changes.jsonl`.
+Files are written to a staging directory and swapped in at once, so features removed from the sources disappear automatically. Changes since the previous run are logged in `data/cache/changes.jsonl`.
 
-## Tietolähteet
+More details: [docs/design.md](docs/design.md).
 
-| Lähde | Mitä | Lisenssi |
+## Data sources and licences
+
+| Source | Data | Licence |
 |---|---|---|
-| Lipas REST API v2 `/sports-sites` | laavut, kodat, tuvat, nuotiopaikat, tornit, telttailu, opastuspisteet, reitit, kansallispuistojen rajat | Lipas / JYU, tarkista lähdemerkintä |
-| Lipas `/lois` | käymälät, puuvajat, kaivot, näköalapaikat ym. | sama |
-| OpenStreetMap (Overpass) | käymälät retkikohteiden lähellä | © OpenStreetMap contributors, ODbL |
-| Tilastokeskus WFS | maakuntarajat | CC BY 4.0 |
+| [Lipas](https://lipas.fi) REST API v2 `/sports-sites` – University of Jyväskylä | shelters, huts, campfire sites, towers, camping, information points, routes, national park boundaries | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| Lipas `/lois` | toilets, woodsheds, wells, viewpoints, landing spots etc. | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| [OpenStreetMap](https://www.openstreetmap.org/copyright) (Overpass API) | supplementary shelters, fire pits, towers and toilets near outdoor sites | [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/), © OpenStreetMap contributors |
+| [Statistics Finland](https://stat.fi) WFS | region boundaries (used for grouping only) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 
-## Tunnetut rajoitukset ja testattavat asiat
+## Licence
 
-Ks. [docs/suunnitelma.md](docs/suunnitelma.md).
+- **Code** and the default icon set: [MIT](LICENSE).
+- **Generated data**: [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/), because it contains OpenStreetMap data. Attribution: *Lipas – University of Jyväskylä (CC BY 4.0); © OpenStreetMap contributors (ODbL 1.0); Statistics Finland (CC BY 4.0)*. Every generated file carries this notice. See [LICENSE-DATA.md](LICENSE-DATA.md).
 
-- Kuvakkeet (`icons/retkeily`, piirretty `scripts/make_icons.py`:llä) ovat omia kuvasymboleja retkeilykarttojen tyyliin, eivät Metsähallituksen symboleja. Metsähallitukselta on pyydetty lupaa heidän symboliensa käyttöön; vaihto = uudet PNG:t samoilla nimillä.
-- Metsähallituksen ylläpitämiä kohteita ja reittejä puuttuu Lipaksesta paikoin, esim. Nuuksiosta.
-- ATAKissa testattavat: iconsetin polkurakenne, `u-d-f`-linkkipisteet ilman korkeutta, hashtag-haku pitkässä remarksissa, GPX `<rte>` → reitti.
+The data is provided as is; always check current information from the site operator before relying on it in the field.
+
+## Known limitations
+
+- Many sites and main trails maintained by Metsähallitus are missing from Lipas (e.g. in Nuuksio). OpenStreetMap fills some of the gaps.
+- Wilderness areas and state hiking areas are not enabled yet.
+
+---
+
+## Suomeksi lyhyesti
+
+Työkalu hakee retkeilykohteet ja reitit Lipaksesta (sekä täydentävästi OpenStreetMapista) ja tekee niistä TAK-käyttöön datapaketit, KMZ-tiedostot, KML-verkkolinkit ja GPX-reitit kansallispuistoittain ja maakunnittain, suomeksi ja englanniksi. Merkkien remarks-kentässä on kuvaus, palvelut ja hashtagit suodatusta varten. Koodi on MIT-lisensoitu, ja tuotettu aineisto on ODbL 1.0 -lisensoitu lähdemainintoineen (Lipas / Jyväskylän yliopisto, © OpenStreetMapin tekijät, Tilastokeskus).

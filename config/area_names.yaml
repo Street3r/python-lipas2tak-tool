@@ -1,10 +1,10 @@
-# Alueiden lyhyet nimet tiedostonimiin ja hashtageihin.
+# Short area names for file names and hashtags.
 #
-# Lipaksessa nimet ovat muotoa "Nuuksion kansallispuisto" (genetiivi), joten
-# perusmuotoa ei voi päätellä luotettavasti (Oulangan -> Oulanka).
-# Avain = nimen alku ennen "kansallispuisto"/"erämaa-alue" -sanaa.
-# Puuttuvalle nimelle käytetään varasääntöä (viimeinen n pois) ja lokiin
-# kirjataan varoitus, jotta nimi voidaan lisätä tähän.
+# Lipas names are like "Nuuksion kansallispuisto" (Finnish genitive), so the
+# base form cannot be derived reliably (Oulangan -> Oulanka).
+# Key = the part of the name before "kansallispuisto"/"erämaa-alue".
+# For a missing name a fallback rule is used (drop a trailing "n") and a
+# warning is logged so the name can be added here.
 
 kansallispuistot:
   "Etelä-Konneveden": Etelä-Konnevesi

@@ -1,4 +1,4 @@
-"""Alueet (kansallispuistot, erämaat, maakunnat) ja kohteiden liittäminen niihin."""
+"""Areas (national parks, wilderness areas, regions) and assigning features to them."""
 from __future__ import annotations
 
 import logging
@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 
 def short_name(full: str, strip: re.Pattern, names: dict[str, str]) -> str:
-    """'Nuuksion kansallispuisto' -> 'Nuuksio' (nimitaulukko tai varasääntö)."""
+    """'Nuuksion kansallispuisto' -> 'Nuuksio' (name table or fallback rule)."""
     full = unicodedata.normalize("NFC", full)
     stem = strip.sub("", full).strip()
     if not stem or stem == full:
@@ -21,7 +21,7 @@ def short_name(full: str, strip: re.Pattern, names: dict[str, str]) -> str:
     names = {unicodedata.normalize("NFC", k): v for k, v in names.items()}
     if stem in names:
         return names[stem]
-    log.warning("Alueen '%s' perusmuoto puuttuu config/area_names.yaml:sta; arvataan", full)
+    log.warning("Base form of area '%s' missing from config/area_names.yaml; guessing", full)
     return stem[:-1] if stem.endswith("n") else stem
 
 
@@ -57,11 +57,11 @@ def areas_from_lipas_sites(sites: list[dict], category: str, cfg: dict,
 
 def assign_areas(features: list[Feature], areas: list[AreaDef], route_min_share: float = 0.3,
                  route_min_inside_m: float = 3000.0) -> None:
-    """Liittää kohteet erityisalueisiin (puistot ym.) puskurilla.
+    """Assign features to special areas (parks etc.) with a buffer.
 
-    Reitti(pala) otetaan mukaan, jos alueella kulkee vähintään `route_min_share`
-    sen pituudesta tai vähintään `route_min_inside_m` metriä. Näin alueen läpi
-    kulkevat pitkät pyöräily- ym. reitit eivät tule mukaan pelkän kosketuksen takia.
+    A route (part) is included if at least `route_min_share` of its length, or
+    at least `route_min_inside_m` metres, lies inside the area. This keeps long
+    cycling etc. routes that merely touch the area out of its package.
     """
     for a in areas:
         shape = geo.Area(a.geometry)
@@ -81,16 +81,16 @@ def assign_areas(features: list[Feature], areas: list[AreaDef], route_min_share:
             if hit:
                 f.areas.append(a.key)
                 n += 1
-        log.info("%s %s: %d kohdetta", a.category, a.name.fi, n)
+        log.info("%s %s: %d features", a.category, a.name.fi, n)
 
 
 def assign_regions(features: list[Feature], regions: list[AreaDef], fallback_km: float = 20.0) -> None:
-    """Liittää jokaisen kohteen yhteen maakuntaan.
+    """Assign every feature to one region (maakunta).
 
-    Lipas-kohteille maakunta päätellään kerran kuntaa kohden (kunta kuuluu
-    aina yhteen maakuntaan). Rannikon ja saarten kohteet voivat jäädä
-    yleistettyjen rajojen ulkopuolelle, joten niille käytetään lähintä
-    maakuntaa enintään `fallback_km` päästä.
+    For Lipas point features the region is resolved once per municipality
+    (a municipality always belongs to one region). Coastal and island features
+    may fall outside the generalised boundaries, so the nearest region within
+    `fallback_km` is used for them.
     """
     shapes = [(r, geo.Area(r.geometry)) for r in regions]
     by_city: dict[int, str | None] = {}
@@ -115,8 +115,8 @@ def assign_regions(features: list[Feature], regions: list[AreaDef], fallback_km:
         if f.point is not None:
             f.region = locate(f.point)
         else:
-            # Reitti: enemmistö näytepisteistä (keskipiste voi olla rajan takana,
-            # esim. Norjan tai Ruotsin puolella kulkevat pyöräilyreitit)
+            # Route: majority of sample points (the midpoint may be across the
+            # border, e.g. cycling routes running on the Norwegian/Swedish side)
             coords = f.all_coords()
             step = max(1, len(coords) // 15)
             votes: dict[str, int] = {}
@@ -129,4 +129,4 @@ def assign_regions(features: list[Feature], regions: list[AreaDef], fallback_km:
             by_city[f.city_code] = f.region
     missing = sum(1 for f in features if not f.region)
     if missing:
-        log.warning("%d kohdetta ilman maakuntaa", missing)
+        log.warning("%d features without a region", missing)

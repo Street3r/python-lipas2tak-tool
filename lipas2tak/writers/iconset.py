@@ -1,12 +1,12 @@
-"""ATAK-kuvakesarja (iconset .zip).
+"""ATAK icon set (iconset .zip).
 
-Rakenne (ATAK-CIV UserIconSet/UserIcon):
-    iconset.xml         <iconset name uid version [defaultGroup skipResize ...]>
-                          <icon name="kuvake.png" type2525b="a-u-G"/>
-    <ryhmä>/<kuvake>.png  ryhmä = hakemisto zipissä (ei XML:ssä)
-CoT-merkit viittaavat kuvakkeeseen polulla `<iconset-uid>/<ryhmä>/<kuvake>.png`.
-Iconsetin UID on kiinteä, jotta kuvakkeiden vaihto (esim. Metsähallituksen
-luvan jälkeen) ei riko jo jaettuja merkkejä: asennetaan vain uusi zip.
+Layout (ATAK-CIV UserIconSet/UserIcon):
+    iconset.xml          <iconset name uid version [defaultGroup skipResize ...]>
+                           <icon name="icon.png" type2525b="a-u-G"/>
+    <group>/<icon>.png   group = directory in the zip (not in the XML)
+CoT markers refer to an icon with the path `<iconset-uid>/<group>/<icon>.png`.
+The iconset UID is fixed so that swapping the icons does not break markers
+that have already been shared: just install the new zip.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def write(path: Path, icons_dir, icons: list[str], cot_type: str = "a-u-G") -> N
     entries = "\n".join(f"  <icon name={quoteattr(i)} type2525b={quoteattr(cot_type)}/>" for i in sorted(set(icons)))
     xml = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-        # Attribuuttinimet ATAKin UserIconSet-luokan mukaan (camelCase)
+        # Attribute names follow ATAK's UserIconSet class (camelCase)
         f'<iconset version="1" name="{ICONSET_NAME}" defaultGroup="{ICONSET_GROUP}" '
         f'uid="{ICONSET_UID}" skipResize="false">\n{entries}\n</iconset>\n'
     )
@@ -43,7 +43,7 @@ def write(path: Path, icons_dir, icons: list[str], cot_type: str = "a-u-G") -> N
 
 
 def _find(dirs, name: str) -> Path:
-    """Ensimmäinen kansio, josta kuvake löytyy (Path tai lista Patheja)."""
+    """First directory containing the icon (a Path or a list of Paths)."""
     for d in (dirs if isinstance(dirs, (list, tuple)) else [dirs]):
         if (Path(d) / name).exists():
             return Path(d) / name

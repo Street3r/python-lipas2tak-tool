@@ -1,4 +1,4 @@
-"""Koko ajo: haku -> normalisointi -> rikastus -> tuotokset -> index.json."""
+"""Full run: fetch -> normalise -> enrich -> write outputs -> index.json."""
 from __future__ import annotations
 
 import hashlib
@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import areas as areas_mod
-from . import normalize, remarks, waypoints
+from . import attribution, normalize, remarks, waypoints
 from .config import Settings, file_slug
 from .model import AreaDef, Feature
 from .sources import lipas, osm, regions
@@ -21,15 +21,15 @@ from .writers import cot, datapackage, gpx, iconset, kml
 log = logging.getLogger(__name__)
 
 
-# --- Raakadata --------------------------------------------------------------
+# --- Raw data ---------------------------------------------------------------
 
 @dataclass
 class RawData:
     sites: list[dict] = field(default_factory=list)              # Lipas sports-sites
-    lois: list[dict] = field(default_factory=list)               # Lipas LOIt
-    osm: dict[str, list[dict]] = field(default_factory=dict)     # kind -> OSM-elementit
-    area_sites: dict[str, list[dict]] = field(default_factory=dict)  # kategoria -> Lipas-aluekohteet
-    regions: list[dict] = field(default_factory=list)            # GeoJSON-featuret
+    lois: list[dict] = field(default_factory=list)               # Lipas LOIs
+    osm: dict[str, list[dict]] = field(default_factory=dict)     # kind -> OSM elements
+    area_sites: dict[str, list[dict]] = field(default_factory=dict)  # category -> Lipas area sites
+    regions: list[dict] = field(default_factory=list)            # GeoJSON features
 
     FILES = ("sites", "lois", "osm", "area_sites", "regions")
 
@@ -66,8 +66,8 @@ def fetch_raw(settings: Settings, clf: normalize.Classifier) -> RawData:
         for kind, tags in clf.osm_queries():
             try:
                 els = osm.fetch(client, oc["overpass_url"], tags)
-            except Exception as e:  # OSM on täydentävä lähde: virhe ei kaada ajoa
-                log.error("OSM-haku epäonnistui (%s %s): %s", kind, tags, e)
+            except Exception as e:  # OSM is a supplementary source: errors do not abort the run
+                log.error("OSM query failed (%s %s): %s", kind, tags, e)
                 continue
             seen = {(e["type"], e["id"]) for e in raw.osm.get(kind, [])}
             raw.osm.setdefault(kind, []).extend(e for e in els if (e["type"], e["id"]) not in seen)
@@ -80,12 +80,12 @@ def fetch_raw(settings: Settings, clf: normalize.Classifier) -> RawData:
     return raw
 
 
-# --- Rikastus -----------------------------------------------------------------
+# --- Enrichment ---------------------------------------------------------------
 
 def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
                    ) -> tuple[list[Feature], dict[str, AreaDef]]:
     feats: list[Feature] = []
-    log.info("Käsitellään %d Lipas-kohdetta ja %d LOI:ta", len(raw.sites), len(raw.lois))
+    log.info("Processing %d Lipas sites and %d LOIs", len(raw.sites), len(raw.lois))
     for n, s in enumerate(raw.sites, 1):
         feats.extend(normalize.lipas_site_to_features(s, clf, settings))
         if n % 2000 == 0:
@@ -94,7 +94,7 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
         f = normalize.loi_to_feature(l, clf)
         if f:
             feats.append(f)
-    # Sama UID kahdesti (esim. sivutuksen päällekkäisyys) -> viimeinen voittaa
+    # Same UID twice (e.g. overlapping pages) -> last one wins
     feats = list({f.uid: f for f in feats}.values())
 
     oc = settings.get("sources", "osm") or {}
@@ -110,10 +110,10 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
             context_radius_m=src.get("context_radius_m", oc.get("context_radius_m", 300)),
             dedupe_radius_m=src.get("dedupe_radius_m", oc.get("dedupe_radius_m", 40)),
             group_of=clf.group_of)
-        log.info("OSM %s: %d/%d otettu mukaan", kind, len(kept), len(cand))
+        log.info("OSM %s: %d/%d included", kind, len(kept), len(cand))
         feats.extend(kept)
 
-    log.info("Kohteita normalisoinnin jälkeen: %d", len(feats))
+    log.info("Features after normalisation: %d", len(feats))
     wp = settings.get("routes", "waypoints") or {}
     if wp.get("enabled", True):
         waypoints.attach_waypoints(
@@ -135,14 +135,13 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
     return feats, all_areas
 
 
-# --- Tuotokset ------------------------------------------------------------------
+# --- Outputs --------------------------------------------------------------------
 
 def _digest(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
 ENDPOINTS = {"start": {"fi": "alku", "en": "start"}, "end": {"fi": "loppu", "en": "end"}}
-
 
 def _route_parts(f: Feature) -> list[tuple[str, list]]:
     if len(f.lines) == 1:
@@ -152,7 +151,7 @@ def _route_parts(f: Feature) -> list[tuple[str, list]]:
 
 def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_areas: dict[str, AreaDef],
                out_root: Path, now: datetime) -> list[dict]:
-    """Kirjoittaa yhden alueen tuotokset kaikilla kielillä. Palauttaa index-merkinnät."""
+    """Write all outputs of one area in every language. Returns index entries."""
     kinds = settings.kinds
     icons_dir = settings.icon_dirs()
     outs = settings.get("outputs") or {}
@@ -173,7 +172,7 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
         folders: dict[str, kml.Folder] = {}
         icon_styles: dict[str, str] = {}
         line_styles: dict[str, tuple[str, float]] = {}
-        gpx_groups: dict[str, tuple[str, str, str, list]] = {}  # ryhmä -> (nimi, remarks, www, viivat)
+        gpx_groups: dict[str, tuple[str, str, str, list]] = {}  # group -> (name, remarks, www, lines)
 
         for f in feats:
             k = kinds[f.kind]
@@ -215,7 +214,8 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
 
         if outs.get("datapackage", True) and cot_items:
             p = d / f"{stem}.zip"
-            datapackage.write(p, f"{title} ({lang})", f"{area.key}/{lang}", cot_items)
+            datapackage.write(p, f"{title} ({lang})", f"{area.key}/{lang}", cot_items,
+                              remarks=attribution.SHORT, notice=attribution.notice_text())
             files["datapackage"] = str(p.relative_to(out_root))
         if outs.get("kmz", True) and cot_items:
             p = d / f"{stem}.kmz"
@@ -242,7 +242,7 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                      for key, (n, r, w, lines) in gpx_groups.items()]
         if outs.get("gpx", True) and gpx_files:
             p = d / f"{stem}_gpx.zip"
-            gpx.write_zip(p, gpx_files)
+            gpx.write_zip(p, gpx_files + [("ATTRIBUTION.txt", attribution.notice_text())])
             files["gpx_zip"] = str(p.relative_to(out_root))
 
         counts: dict[str, int] = {}
@@ -258,7 +258,7 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
 
 def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         now: Optional[datetime] = None) -> dict:
-    """Tuottaa kaikki tiedostot. `only`: rajaus alueavaimiin (esim. kansallispuistot/nuuksio)."""
+    """Produce all files. `only`: restrict to area keys or slugs (e.g. kansallispuistot/nuuksio)."""
     now = now or datetime.now(timezone.utc)
     clf = normalize.Classifier(settings)
     feats, all_areas = build_features(settings, raw, clf)
@@ -279,7 +279,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         else:
             sel = [f for f in feats if area.key in f.areas]
         if not sel:
-            log.info("%s: ei kohteita, ohitetaan", area.key)
+            log.info("%s: no features, skipped", area.key)
             continue
         index_areas.extend(write_area(settings, area, sel, all_areas, staging, now))
 
@@ -288,18 +288,16 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         "public_base_url": settings.get("public_base_url"),
         "iconset": "iconset/lipas2tak_iconset.zip",
         "iconset_uid": iconset.ICONSET_UID,
-        "attribution": [
-            "Lipas – Jyväskylän yliopisto (lipas.fi)",
-            "© OpenStreetMap contributors (ODbL)",
-            "Maakuntarajat: Tilastokeskus (CC BY 4.0)",
-        ],
+        "license": attribution.LICENSE_ID,
+        "license_url": attribution.LICENSE_URL,
+        "attribution": attribution.ATTRIBUTION,
         "areas": index_areas,
     }
     (staging / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
     (staging / "index.html").write_text(render_index_html(index), encoding="utf-8")
 
     changes = diff_state(settings.path("cache") / "state.json", index_areas, now)
-    # Atominen vaihto: vanhat (poistuneet) tiedostot katoavat samalla
+    # Atomic swap: old (removed) files disappear at the same time
     old = out_root.parent / (out_root.name + ".old")
     if old.exists():
         shutil.rmtree(old)
@@ -308,14 +306,14 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     staging.rename(out_root)
     if old.exists():
         shutil.rmtree(old)
-    log.info("Valmis: %d aluetta, %d kohdetta", len({e['key'] for e in index_areas}), len(feats))
+    log.info("Done: %d areas, %d features", len({e['key'] for e in index_areas}), len(feats))
     return {"index": index, "changes": changes, "features": len(feats)}
 
 
-# --- Muutosseuranta ---------------------------------------------------------------
+# --- Change tracking --------------------------------------------------------------
 
 def diff_state(state_path: Path, entries: list[dict], now: datetime) -> dict:
-    """Vertaa edelliseen ajoon (UID -> sisällön tiiviste) ja tallentaa uuden tilan."""
+    """Compare with the previous run (UID -> content digest) and store the new state."""
     cur = {f"{e['key']}/{e['lang']}": e["uids"] for e in entries}
     prev = {}
     if state_path.exists():
@@ -347,16 +345,17 @@ def render_index_html(index: dict) -> str:
         rows.append(f"<tr><td>{escape(e['lang'])}</td><td>{escape(e['category'])}</td>"
                     f"<td>{escape(e['name'])}</td><td>{total}</td><td>{links}</td></tr>")
     return (
-        "<!doctype html><html lang='fi'><meta charset='utf-8'>"
+        "<!doctype html><html lang='en'><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<title>Lipas → TAK</title>"
         "<style>body{font-family:system-ui,sans-serif;margin:16px}table{border-collapse:collapse;width:100%}"
         "td,th{border-bottom:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}"
         "a{margin-right:.6em;white-space:nowrap}</style>"
-        f"<h1>Lipas → TAK</h1><p>Päivitetty {escape(index['generated'])}. "
-        f"Kuvakesarja: <a href='{escape(index['iconset'])}'>lipas2tak_iconset.zip</a>. "
-        f"KML-verkkolinkkien osoite: {escape(base)}</p>"
-        "<table><tr><th>Kieli</th><th>Tyyppi</th><th>Alue</th><th>Kohteita</th><th>Tiedostot</th></tr>"
+        f"<h1>Lipas → TAK</h1><p>Updated {escape(index['generated'])}. "
+        f"Icon set: <a href='{escape(index['iconset'])}'>lipas2tak_iconset.zip</a>. "
+        f"Base URL for KML network links: {escape(base)}</p>"
+        "<table><tr><th>Lang</th><th>Type</th><th>Area</th><th>Features</th><th>Files</th></tr>"
         + "".join(rows) + "</table>"
-        f"<p><small>{' · '.join(escape(a) for a in index['attribution'])}</small></p></html>"
+        f"<p><small>Data licence: <a href='{escape(index['license_url'])}'>ODbL 1.0</a>. "
+        f"{' · '.join(escape(a) for a in index['attribution'])}</small></p></html>"
     )

@@ -1,4 +1,4 @@
-"""Asetusten lataus (config.yaml + types.yaml) ja ympäristömuuttujat."""
+"""Settings loading (config.yaml + types.yaml) and environment variables."""
 from __future__ import annotations
 
 import os
@@ -22,9 +22,9 @@ _ENV_OVERRIDES = {
 
 
 def slugify(text: str) -> str:
-    """Hashtag-/tiedostonimikelpoinen tunniste: a-z0-9 ja väliviiva pois.
+    """Identifier usable as a hashtag / file name: a-z0-9 only.
 
-    ä→a, ö→o, å→a (ATAKin hashtag-haun varmuuden vuoksi vain ASCII).
+    ä→a, ö→o, å→a (ASCII only, to be safe with ATAK hashtag search).
     """
     t = unicodedata.normalize("NFKD", text.lower())
     t = "".join(ch for ch in t if not unicodedata.combining(ch))
@@ -49,8 +49,8 @@ class Kind:
     color: str | None
     sources: dict
     enabled: bool = True
-    route_method: str = "Walking"   # ATAK-reitin kulkutapa (link_attr method)
-    route_type: str = "On Foot"     # ATAK-reitin tyyppi (link_attr type)
+    route_method: str = "Walking"   # ATAK route travel method (link_attr method)
+    route_type: str = "On Foot"     # ATAK route type (link_attr type)
 
     @property
     def is_route(self) -> bool:
@@ -87,10 +87,10 @@ class Settings:
         return list(self.get("languages", default=["fi"]))
 
     def icon_dirs(self) -> list[Path]:
-        """Kuvakekansiot etusijajärjestyksessä: valittu sarja, sitten varasarja.
+        """Icon directories in priority order: selected set, then fallback set.
 
-        Puuttuva kuvake haetaan varasarjasta, joten valitussa sarjassa voi
-        olla vain osa kuvakkeista (esim. pilotin Luontoon.fi-kuvakkeet).
+        A missing icon is taken from the fallback set, so the selected set may
+        contain only some of the icons (e.g. a custom set used in a pilot).
         """
         dirs = [self.path("icons")]
         fb = self.get("paths", "icons_fallback")
@@ -113,7 +113,7 @@ def load_settings(config_path: str | Path | None = None, types_path: str | Path 
                   root: Path | None = None) -> Settings:
     config_path = Path(config_path or os.environ.get("LIPAS2TAK_CONFIG") or (root or ROOT) / "config" / "config.yaml")
     types_path = Path(types_path or os.environ.get("LIPAS2TAK_TYPES") or config_path.parent / "types.yaml")
-    # Suhteelliset polut (icons, data) ratkaistaan config-hakemiston yläkansiosta
+    # Relative paths (icons, data) are resolved from the parent of the config directory
     root = root or config_path.resolve().parent.parent
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     for env, path in _ENV_OVERRIDES.items():

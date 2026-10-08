@@ -1,6 +1,6 @@
-"""OpenStreetMap Overpass -haku (esim. käymälät, joita Lipaksessa ei ole kattavasti).
+"""OpenStreetMap Overpass queries (e.g. toilets and shelters missing from Lipas).
 
-OSM-data © OpenStreetMap contributors, ODbL 1.0.
+OSM data © OpenStreetMap contributors, ODbL 1.0.
 """
 from __future__ import annotations
 
@@ -25,5 +25,5 @@ def fetch(client: CachedClient, overpass_url: str, tags: dict[str, str]) -> list
     q = build_query(tags)
     data = client.get_json(overpass_url, method="POST", data={"data": q})
     els = data.get("elements", [])
-    log.info("OSM %s: %d kohdetta", tags, len(els))
+    log.info("OSM %s: %d elements", tags, len(els))
     return els

@@ -1,10 +1,10 @@
-"""Piirtää retkeilykuvakkeet (icons/retkeily/*.png).
+"""Draw the outdoor icon set (icons/retkeily/*.png).
 
-Omat, alkuperäiset kuvasymbolit yleisessä retkeilykarttojen tyylissä:
-värillinen pyöristetty neliö + valkoinen kuvake. EIVÄT ole Metsähallituksen
-symboleja; ne voidaan vaihtaa niihin, jos käyttölupa saadaan.
+Original pictograms in the general style of outdoor recreation maps:
+a coloured rounded square with a white symbol. These are this project's own
+drawings, not Metsähallitus symbols.
 
-Ajo: python scripts/make_icons.py
+Run: python scripts/make_icons.py
 """
 from __future__ import annotations
 
@@ -14,19 +14,19 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 OUT = Path(__file__).resolve().parent.parent / "icons" / "retkeily"
-S = 256          # piirtokoko (skaalataan 64 px:iin antialiasointia varten)
+S = 256          # drawing size (downscaled to 64 px for antialiasing)
 OUT_SIZE = 64
 W = "white"
-LW = 16          # viivan paksuus piirtokoossa
+LW = 16          # line width at drawing size
 
-# Ryhmävärit (samat kuin types.yaml-ryhmissä)
-BROWN = "#7A4A24"    # suojat
-ORANGE = "#C8551B"   # tulentekopaikat
-SLATE = "#2C3E50"    # tornit ja näköalat
-GREEN = "#2E8B3E"    # telttailu
-BLUE = "#1F6FB2"     # käymälät, vesi
-TEAL = "#138D75"     # opasteet
-GREY = "#6E7B7F"     # muut
+# Group colours (same as the groups in types.yaml)
+BROWN = "#7A4A24"    # shelters
+ORANGE = "#C8551B"   # fire places
+SLATE = "#2C3E50"    # towers and viewpoints
+GREEN = "#2E8B3E"    # camping
+BLUE = "#1F6FB2"     # toilets, water
+TEAL = "#138D75"     # information
+GREY = "#6E7B7F"     # other
 
 
 def _font(size: int):
@@ -51,13 +51,13 @@ def text(d, s: str, size: int, y: int = S // 2):
 
 
 def flame(d, cx: int, by: int, h: int, bg: str | None = None):
-    """Liekki: pisara (kärki ylhäällä), sisällä pienempi pisara taustavärillä."""
+    """Flame: a drop (tip up) with a smaller drop in the background colour inside."""
 
     def drop(cx, by, h, fill):
         r = h * 0.34
         cy = by - r
         tip = (cx, by - h)
-        # tangenttipisteet ympyrälle kärjestä katsottuna
+        # tangent points on the circle as seen from the tip
         dist = cy - tip[1]
         a = math.asin(min(1.0, r / dist))
         tx = r * math.cos(a)
@@ -75,15 +75,15 @@ def logs(d, y: int):
     d.line((70, y + 18, 186, y - 18), fill=W, width=LW)
 
 
-# --- Kuvakkeet --------------------------------------------------------------
+# --- Icons -----------------------------------------------------------------
 
 def laavu():
     img, d = base(BROWN)
-    d.line((40, 196, 216, 196), fill=W, width=LW)               # maa
-    d.line((128, 54, 46, 196), fill=W, width=LW + 4)            # katon reunat
+    d.line((40, 196, 216, 196), fill=W, width=LW)               # ground
+    d.line((128, 54, 46, 196), fill=W, width=LW + 4)            # roof edges
     d.line((128, 54, 210, 196), fill=W, width=LW + 4)
-    d.polygon([(128, 54), (150, 92), (106, 92)], fill=W)        # harjan täyte
-    d.line((128, 92, 128, 196), fill=W, width=8)                # takaseinän sauma
+    d.polygon([(128, 54), (150, 92), (106, 92)], fill=W)        # ridge fill
+    d.line((128, 92, 128, 196), fill=W, width=8)                # back wall seam
     flame(d, 128, 192, 56, BROWN)
     return img
 
@@ -91,8 +91,8 @@ def laavu():
 def kota():
     img, d = base(BROWN)
     d.polygon([(128, 52), (204, 192), (52, 192)], fill=W)
-    d.polygon([(128, 128), (152, 192), (104, 192)], fill=BROWN)  # oviaukko
-    d.line((114, 66, 98, 44), fill=W, width=10)  # savureiän kepit
+    d.polygon([(128, 128), (152, 192), (104, 192)], fill=BROWN)  # doorway
+    d.line((114, 66, 98, 44), fill=W, width=10)  # smoke hole poles
     d.line((142, 66, 158, 44), fill=W, width=10)
     return img
 
@@ -101,8 +101,8 @@ def tupa():
     img, d = base(BROWN)
     d.polygon([(128, 52), (210, 122), (46, 122)], fill=W)
     d.rectangle((70, 118, 186, 196), fill=W)
-    d.rectangle((112, 146, 144, 196), fill=BROWN)  # ovi
-    d.rectangle((158, 66, 176, 100), fill=W)       # savupiippu
+    d.rectangle((112, 146, 144, 196), fill=BROWN)  # door
+    d.rectangle((158, 66, 176, 100), fill=W)       # chimney
     return img
 
 
@@ -115,8 +115,8 @@ def nuotiopaikka():
 
 def keittokatos():
     img, d = base(ORANGE)
-    d.polygon([(128, 46), (214, 104), (42, 104)], fill=W)   # katto
-    d.line((66, 104, 66, 196), fill=W, width=LW)           # tolpat
+    d.polygon([(128, 46), (214, 104), (42, 104)], fill=W)   # roof
+    d.line((66, 104, 66, 196), fill=W, width=LW)           # posts
     d.line((190, 104, 190, 196), fill=W, width=LW)
     flame(d, 128, 188, 66, ORANGE)
     return img
@@ -124,18 +124,18 @@ def keittokatos():
 
 def nakotorni():
     img, d = base(SLATE)
-    d.polygon([(100, 48), (156, 48), (172, 80), (84, 80)], fill=W)  # katos
-    d.rectangle((92, 80, 164, 96), fill=W)                          # tasanne
-    d.line((104, 96, 84, 204), fill=W, width=LW)                    # jalat
+    d.polygon([(100, 48), (156, 48), (172, 80), (84, 80)], fill=W)  # canopy
+    d.rectangle((92, 80, 164, 96), fill=W)                          # platform
+    d.line((104, 96, 84, 204), fill=W, width=LW)                    # legs
     d.line((152, 96, 172, 204), fill=W, width=LW)
-    d.line((100, 130, 160, 170), fill=W, width=10)                  # ristikko
+    d.line((100, 130, 160, 170), fill=W, width=10)                  # bracing
     d.line((156, 130, 96, 170), fill=W, width=10)
     return img
 
 
 def nakoalapaikka():
     img, d = base(SLATE)
-    # silmä
+    # eye
     d.ellipse((44, 86, 212, 170), outline=W, width=LW)
     d.ellipse((100, 98, 156, 158), fill=W)
     d.ellipse((118, 116, 138, 136), fill=SLATE)
@@ -164,7 +164,7 @@ def opastuspiste():
 
 def luontokeskus():
     img, d = base(TEAL)
-    # lehti: linssimuoto 45° kulmassa + keskiruoti
+    # leaf: lens shape at 45° plus midrib
     pts = []
     for i in range(61):
         t = i / 60 * math.pi
@@ -174,7 +174,7 @@ def luontokeskus():
     poly = [(128 + x * c - y * sn, 128 + x * sn + y * c) for x, y in pts]
     d.polygon(poly, fill=W)
     d.line((76, 180, 180, 76), fill=TEAL, width=9)
-    d.line((60, 196, 84, 172), fill=W, width=12)  # varsi
+    d.line((60, 196, 84, 172), fill=W, width=12)  # stem
     return img
 
 
@@ -197,7 +197,7 @@ def vesipiste():
 
 def rantautumispaikka():
     img, d = base(BLUE)
-    # vene
+    # boat
     d.polygon([(40, 140), (216, 140), (186, 184), (70, 184)], fill=W)
     d.line((128, 140, 128, 60), fill=W, width=10)
     d.polygon([(136, 64), (190, 132), (136, 132)], fill=W)

@@ -1,6 +1,6 @@
-"""GPX 1.1 -reitit (<rte>), jotka ATAK voi muuntaa navigoitaviksi reiteiksi.
+"""GPX 1.1 routes (<rte>) that ATAK can convert to navigable routes.
 
-Korkeutta (<ele>) ei kirjoiteta.
+Altitude (<ele>) is not written.
 """
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from .. import attribution
 from ..geo import Line
 
 HEADER = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -16,8 +17,9 @@ HEADER = ('<?xml version="1.0" encoding="UTF-8"?>\n'
 
 
 def route_gpx(name: str, desc: str, lines: list, link: str = "") -> str:
-    """`lines`: [Line] tai [(Line, {solmuindeksi: nimi})] – nimetyt pisteet saavat <name>."""
-    parts = [HEADER, f"<metadata><name>{escape(name)}</name>"]
+    """`lines`: [Line] or [(Line, {vertex index: name})] – named points get a <name>."""
+    parts = [HEADER, f"<metadata><name>{escape(name)}</name>",
+             f'<copyright author="{escape(attribution.GPX_AUTHOR)}"><license>{attribution.LICENSE_URL}</license></copyright>']
     if link:
         parts.append(f'<link href="{escape(link)}"/>')
     parts.append("</metadata>\n")

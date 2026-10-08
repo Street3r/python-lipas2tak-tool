@@ -1,4 +1,4 @@
-"""Lähdedatan muunto sisäiseen malliin (Feature) ja kohdetyypin päättely."""
+"""Convert source data to the internal model (Feature) and resolve the feature kind."""
 from __future__ import annotations
 
 import copy
@@ -13,7 +13,7 @@ from .model import Feature, Localized
 log = logging.getLogger(__name__)
 
 
-# --- Luokittelu -------------------------------------------------------------
+# --- Classification ---------------------------------------------------------
 
 class Classifier:
     def __init__(self, settings: Settings):
@@ -33,7 +33,7 @@ class Classifier:
         return sorted(types)
 
     def osm_queries(self) -> list[tuple[str, dict]]:
-        """[(kind, tagit)] – `tags` voi olla yksi dict tai lista vaihtoehtoisia dictejä."""
+        """[(kind, tags)] – `tags` may be a single dict or a list of alternative dicts."""
         out = []
         for k in self.kinds:
             src = k.sources.get("osm")
@@ -149,13 +149,13 @@ def lipas_site_to_features(site: dict, clf: Classifier, settings: Settings) -> l
         pts = [f["geometry"]["coordinates"] for f in features
                if (f.get("geometry") or {}).get("type") == "Point"]
         if not pts:
-            log.debug("Lipas %s: ei pistegeometriaa", lid)
+            log.debug("Lipas %s: no point geometry", lid)
             return []
         return [Feature(uid=f"lipas-{lid}", name=Localized(fi=name, en=name_loc.get("en") or ""),
                         point=(float(pts[0][0]), float(pts[0][1])), **base)]
 
-    # Reitit: jos activities sisältää alireittejä (Luontoon.fi-rikastus),
-    # kustakin tehdään oma reittinsä; muuten koko kohde on yksi reitti.
+    # Routes: if `activities` contains sub-routes (Luontoon.fi enrichment),
+    # each becomes its own route; otherwise the whole site is one route.
     out: list[Feature] = []
     sub = _activity_routes(site)
     if sub:
@@ -186,8 +186,9 @@ def lipas_site_to_features(site: dict, clf: Classifier, settings: Settings) -> l
             return []
         out.append(Feature(uid=f"lipas-{lid}", name=Localized(fi=name, en=name_loc.get("en") or ""),
                            lines=lines, length_km=props.get("route-length-km"), **base))
-    # Erilliset palat omiksi kohteikseen: alue- ja maakuntajako tehdään palakohtaisesti
-    # (pitkät reitit voivat kulkea usean alueen läpi). GPX kokoaa palat takaisin yhteen.
+    # Disconnected parts become features of their own so that area and region
+    # assignment is done per part (long routes may cross several areas).
+    # GPX output groups the parts back together.
     split: list[Feature] = []
     for f in out:
         if len(f.lines) == 1:
@@ -260,11 +261,11 @@ def osm_to_feature(el: dict, kind_key: str) -> Optional[Feature]:
 
 def dedupe_osm(features: Iterable[Feature], context: list[Feature], *, context_radius_m: float,
                dedupe_radius_m: float, group_of=None) -> list[Feature]:
-    """Pitää OSM-kohteet, jotka ovat retkikohteiden lähellä eivätkä ole kaksoiskappaleita.
+    """Keep OSM features that are near outdoor features and are not duplicates.
 
-    Kaksoiskappale = samaan ryhmään kuuluva kohde (esim. suojat: laavu/kota/tupa)
-    alle `dedupe_radius_m` päässä. Lipas/LOI voittaa aina OSM:n. Myös jo
-    hyväksytyt OSM-kohteet ovat vertailussa (node + way samasta kohteesta).
+    Duplicate = a feature of the same group (e.g. shelters: lean-to/kota/hut)
+    within `dedupe_radius_m`. Lipas/LOI always wins over OSM. Already accepted
+    OSM features are compared too (node + way of the same object).
     """
     group_of = group_of or (lambda k: k)
     grid = geo.GridIndex.for_radius(max(context_radius_m, dedupe_radius_m))

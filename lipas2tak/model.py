@@ -1,4 +1,4 @@
-"""Sisäinen tietomalli: kaikki lähteet normalisoidaan näiksi."""
+"""Internal data model: all sources are normalised to these."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -29,18 +29,18 @@ class Localized:
 
 @dataclass
 class Feature:
-    """Yksi merkki tai reitti."""
+    """A single marker or route."""
 
-    uid: str                     # pysyvä CoT-UID, esim. lipas-509474
+    uid: str                     # stable CoT UID, e.g. lipas-509474
     source: str                  # lipas | loi | osm
     source_id: str
-    kind: str                    # types.yaml:n kind
+    kind: str                    # kind from types.yaml
     name: Localized
-    point: Optional[Coord] = None            # merkit
-    lines: list[Line] = field(default_factory=list)  # reitit (yksinkertaistettu)
+    point: Optional[Coord] = None            # markers
+    lines: list[Line] = field(default_factory=list)  # routes (simplified)
     description: Localized = field(default_factory=Localized)
-    services: list[str] = field(default_factory=list)   # palveluavaimet, esim. toilet
-    marking: Localized = field(default_factory=Localized)  # reitin maastomerkintä
+    services: list[str] = field(default_factory=list)   # service keys, e.g. toilet
+    marking: Localized = field(default_factory=Localized)  # trail marking in the terrain
     accessibility: Localized = field(default_factory=Localized)
     length_km: Optional[float] = None
     www: str = ""
@@ -48,13 +48,13 @@ class Feature:
     status: str = "active"
     city_code: Optional[int] = None
     updated: str = ""
-    group_uid: str = ""        # monipalaisen reitin yhteinen tunniste (GPX-kokoamiseen)
-    # Reitin varren kohderyppäät nimettyinä reittipisteinä: [(solmuindeksi, [Feature, ...])]
-    # (ensimmäinen Feature = ryppään edustaja, jonka nimi näytetään)
+    group_uid: str = ""        # shared id of a multi-part route (used to group GPX output)
+    # Clusters of features along the route as named waypoints: [(vertex index, [Feature, ...])]
+    # (first Feature = cluster representative whose name is shown)
     waypoints: list = field(default_factory=list)
-    # Täytetään rikastusvaiheessa
-    areas: list[str] = field(default_factory=list)    # alueavaimet, esim. kansallispuistot/nuuksio
-    region: Optional[str] = None                      # maakunta-avain, esim. maakunnat/uusimaa
+    # Filled in during enrichment
+    areas: list[str] = field(default_factory=list)    # area keys, e.g. kansallispuistot/nuuksio
+    region: Optional[str] = None                      # region key, e.g. maakunnat/uusimaa
 
     @property
     def is_route(self) -> bool:
@@ -68,12 +68,12 @@ class Feature:
 
 @dataclass
 class AreaDef:
-    """Kansallispuisto, erämaa-alue tai maakunta."""
+    """National park, wilderness area or region."""
 
-    slug: str            # esim. nuuksio, uusimaa
+    slug: str            # e.g. nuuksio, uusimaa
     category: str        # kansallispuistot | eramaat | maakunnat ...
     name: Localized
-    tag: str             # hashtag ilman #
+    tag: str             # hashtag without #
     geometry: dict
     buffer_m: float = 0.0
 

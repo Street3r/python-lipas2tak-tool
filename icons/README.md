@@ -1,41 +1,43 @@
-# Kuvakesarjat
+# Icon sets
 
-| Kansio | Sisältö | Repossa |
+| Folder | Contents | In the repo |
 |---|---|---|
-| `retkeily/` | Oma kuvasymbolisarja (`scripts/make_icons.py`). Oletus, vapaasti jaettava. | kyllä |
-| `placeholder/` | Vanhat kirjainkuvakkeet | kyllä |
-| `luontoon/` | Pilottikäytön Luontoon.fi-/Metsähallitus-kuvakkeet | **ei** (`.gitignore`) |
+| `retkeily/` | The project's own pictogram set (`scripts/make_icons.py`). Default; MIT licensed. | yes |
+| `custom/` | Optional local icon set for your own deployment | **no** (`.gitignore`) |
 
-## Oman sarjan käyttö (esim. Luontoon.fi-kuvakkeet pilotissa)
+## Using a custom icon set
 
-Metsähallituksen symbolit ovat heidän tekijänoikeudellista materiaaliaan. Niitä
-ei lisätä repoon ennen kuin käyttölupa on saatu. Sisäistä pilottia varten
-kuvakkeet laitetaan palvelimelle erikseen:
+Only use icons you have the right to use and distribute: they are embedded in
+the generated iconset and KMZ files. Custom icons are kept outside the
+repository.
 
-1. Tallenna PNG-tiedostot (suositus 64×64, läpinäkyvä tausta) näillä nimillä:
+1. Save PNG files (64×64 recommended, transparent background) with these names:
 
-   | Tiedosto | Kohde |
+   | File | Feature |
    |---|---|
-   | `laavu.png` | laavu |
-   | `kota.png` | kota, kammi |
-   | `tupa.png` | tupa |
-   | `nuotiopaikka.png` | nuotiopaikka |
-   | `keittokatos.png` | keittokatos |
-   | `nakotorni.png` | näkötorni |
-   | `nakoalapaikka.png` | näköalapaikka |
-   | `telttapaikka.png` | telttapaikka |
-   | `kaymala.png` | käymälä |
-   | `opastuspiste.png` | opastuspiste |
-   | `luontokeskus.png` | luontokeskus |
-   | `puuvaja.png` | puuvaja |
-   | `vesipiste.png` | kaivo / vesipiste |
-   | `rantautumispaikka.png` | rantautumispaikka |
-   | `pysakointi.png` | pysäköinti |
+   | `laavu.png` | lean-to shelter |
+   | `kota.png` | hut (kota), turf hut (kammi) |
+   | `tupa.png` | wilderness / rental hut |
+   | `nuotiopaikka.png` | campfire site |
+   | `keittokatos.png` | cooking shelter |
+   | `nakotorni.png` | observation tower |
+   | `nakoalapaikka.png` | viewpoint |
+   | `telttapaikka.png` | camping site |
+   | `kaymala.png` | toilet |
+   | `opastuspiste.png` | information point |
+   | `luontokeskus.png` | nature centre |
+   | `puuvaja.png` | woodshed |
+   | `vesipiste.png` | well / water point |
+   | `rantautumispaikka.png` | landing spot |
+   | `pysakointi.png` | parking |
 
-   Puuttuvat tiedostot korvataan automaattisesti `retkeily/`-sarjan kuvakkeilla.
+   Missing files fall back to the `retkeily/` set automatically.
 
-2. Ota sarja käyttöön ympäristömuuttujalla `LIPAS2TAK_ICONS_DIR=<kansio>`
-   (docker-lipas-integrationissa: ks. `.env.example`).
+2. Enable the set with the environment variable `LIPAS2TAK_ICONS_DIR=<folder>`
+   (in docker-lipas-integration: see `.env.example`).
 
-Iconsetin UID pysyy samana sarjasta riippumatta: kun ATAKiin asennetaan uusi
-`lipas2tak_iconset.zip`, jo jaetut merkit vaihtavat ulkoasua.
+The iconset UID stays the same regardless of the set: when a new
+`lipas2tak_iconset.zip` is installed in ATAK, markers that were already shared
+change their appearance.
+
+To redraw the default set: `pip install Pillow && python scripts/make_icons.py`.

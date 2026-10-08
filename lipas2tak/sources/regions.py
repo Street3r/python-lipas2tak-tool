@@ -1,4 +1,4 @@
-"""Maakuntarajat Tilastokeskuksen WFS-palvelusta (CC BY 4.0)."""
+"""Regional (maakunta) boundaries from the Statistics Finland WFS service (CC BY 4.0)."""
 from __future__ import annotations
 
 import logging
@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 
 def _fix_axis_order(geom: dict) -> dict:
-    """Varmistaa (lon, lat)-järjestyksen. Suomessa lat ~59–71, lon ~19–32."""
+    """Ensure (lon, lat) axis order. In Finland lat is ~59–71 and lon ~19–32."""
 
     def first_coord(c):
         while isinstance(c[0], list):
@@ -19,7 +19,7 @@ def _fix_axis_order(geom: dict) -> dict:
         return c
 
     c = first_coord(geom["coordinates"])
-    if c[0] > 50:  # ensimmäinen arvo on leveysaste -> käännetään
+    if c[0] > 50:  # first value is latitude -> swap
 
         def swap(x):
             if isinstance(x[0], list):
@@ -58,5 +58,5 @@ def fetch_regions_from_features(features: list[dict]) -> list[AreaDef]:
             tag=slugify(fi),
             geometry=_fix_axis_order(f["geometry"]),
         ))
-    log.info("Maakuntia: %d", len(out))
+    log.info("Regions: %d", len(out))
     return out

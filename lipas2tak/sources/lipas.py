@@ -1,8 +1,8 @@
-"""Lipas REST API v2: /sports-sites ja /lois.
+"""Lipas REST API v2: /sports-sites and /lois.
 
-Rajapinta: https://api.lipas.fi/v2 (avoin, ei tunnistautumista).
-Monivalintaparametrit (type-codes, statuses ...) lähetetään toistettuina
-query-parametreina (`type-codes=301&type-codes=302`).
+API: https://api.lipas.fi/v2 (open, no authentication).
+Multi-value parameters (type-codes, statuses ...) are sent as repeated
+query parameters (`type-codes=301&type-codes=302`).
 """
 from __future__ import annotations
 
@@ -34,10 +34,10 @@ class LipasClient:
             page += 1
 
     def sports_sites(self, type_codes: list[int], statuses: list[str] | None = None) -> Iterator[dict]:
-        """Hakee kaikki kohteet annetuilla tyyppikoodeilla, yksi tyyppi kerrallaan.
+        """Fetch all sites with the given type codes, one type at a time.
 
-        Yksi tyyppi kerrallaan, koska välimuisti ja virhetilanteet ovat silloin
-        selkeämpiä ja yksittäisen tyypin uudelleenhaku on halpa.
+        One type at a time keeps caching and error handling simple, and
+        re-fetching a single type is cheap.
         """
         for code in sorted(set(type_codes)):
             params: dict = {"type-codes": [code]}
@@ -47,7 +47,7 @@ class LipasClient:
             for item in self._paged("/sports-sites", params):
                 n += 1
                 yield item
-            log.info("Lipas tyyppi %s: %d kohdetta", code, n)
+            log.info("Lipas type %s: %d sites", code, n)
 
     def lois(self, types: list[str], statuses: list[str] | None = None) -> Iterator[dict]:
         for t in sorted(set(types)):
@@ -58,4 +58,4 @@ class LipasClient:
             for item in self._paged("/lois", params):
                 n += 1
                 yield item
-            log.info("Lipas LOI %s: %d kohdetta", t, n)
+            log.info("Lipas LOI %s: %d items", t, n)

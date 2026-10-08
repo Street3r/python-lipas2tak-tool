@@ -1,21 +1,23 @@
-# Kohdetyypit ("kind") ja niiden lähteet, ulkoasu ja tagit.
+# Feature kinds and their sources, appearance and tags.
 #
-# Jokainen kohde päätyy täsmälleen yhteen kindiin. Luokittelu käy kindit läpi
-# tässä järjestyksessä ja valitsee ensimmäisen, jonka jokin lähde täsmää.
-# Siksi tarkemmat säännöt (esim. kota nimen perusteella) ovat ennen yleisiä
-# (laavu = muu tyyppi 301).
+# Every feature ends up in exactly one kind. Classification goes through the
+# kinds in this order and picks the first one with a matching source, so more
+# specific rules (e.g. kota by name) come before general ones (laavu = any
+# other type 301).
 #
-# Kentät:
-#   label:    näyttönimi fi/en
-#   tag:      hashtag fi/en (ilman #-merkkiä, vain a-z0-9)
-#   group:    KMZ-kansio / erillinen tyyppikohtainen KMZ (ks. groups alla)
-#   icon:     kuvaketiedosto iconsetissä (icons/<set>/<icon>)
-#   cot_type: CoT-tyyppi merkille (pisteet)
-#   color:    reittiviivan väri #RRGGBB (reitit)
+# Fields:
+#   label:    display name fi/en
+#   tag:      hashtag fi/en (without #, a-z0-9 only)
+#   group:    KMZ folder / separate per-group KMZ (see groups below)
+#   icon:     icon file in the icon set (icons/<set>/<icon>)
+#   cot_type: CoT type for markers (points)
+#   color:    line colour #RRGGBB (routes)
+#   route_method / route_type: ATAK route link_attr values (default Walking / On Foot)
 #   sources:
-#     lipas:  type_codes + valinnainen name_regex (Python regex, case-insensitive)
-#     loi:    Lipaksen /v2/lois loi-typet
-#     osm:    OpenStreetMap-tagit (Overpass), esim. {amenity: toilets}
+#     lipas:  type_codes + optional name_regex (Python regex, case-insensitive)
+#     loi:    Lipas /v2/lois loi-types
+#     osm:    OpenStreetMap tags (Overpass), e.g. {amenity: toilets}; a list of
+#             dicts = alternatives. Optional context_radius_m / dedupe_radius_m.
 
 groups:
   suojat:          {label: {fi: "Laavut, kodat ja tuvat", en: "Shelters and huts"}}
@@ -28,7 +30,7 @@ groups:
   reitit:          {label: {fi: "Reitit", en: "Routes"}}
 
 kinds:
-  # --- Suojat -------------------------------------------------------------
+  # --- Shelters -----------------------------------------------------------
   kota:
     label: {fi: Kota, en: Hut (kota)}
     tag: {fi: kota, en: kota}
@@ -37,7 +39,7 @@ kinds:
     cot_type: a-u-G
     sources:
       lipas: {type_codes: [301], name_regex: "kota|kåta"}
-      # OSM-täydennys: otetaan vain, jos Lipaksessa ei ole lähellä samaan ryhmään kuuluvaa kohdetta
+      # OSM supplement: used only if Lipas has no feature of the same group nearby
       osm: {tags: {amenity: shelter, shelter_type: basic_hut}, context_radius_m: 1500, dedupe_radius_m: 120}
   kammi:
     label: {fi: Kammi, en: Turf hut}
@@ -66,7 +68,7 @@ kinds:
       lipas: {type_codes: [302]}
       osm: {tags: {tourism: wilderness_hut}, context_radius_m: 3000, dedupe_radius_m: 150}
 
-  # --- Tulentekopaikat ------------------------------------------------------
+  # --- Campfire sites -------------------------------------------------------
   keittokatos:
     label: {fi: Keittokatos, en: Cooking shelter}
     tag: {fi: keittokatos, en: cookingshelter}
@@ -88,7 +90,7 @@ kinds:
       loi: {types: [fire-pit]}
       osm: {tags: {leisure: firepit}, context_radius_m: 1500, dedupe_radius_m: 60}
 
-  # --- Näkötornit ---------------------------------------------------------
+  # --- Towers and viewpoints ---------------------------------------------
   nakotorni:
     label: {fi: Näkötorni, en: Observation tower}
     tag: {fi: nakotorni, en: tower}
@@ -109,7 +111,7 @@ kinds:
       loi: {types: [viewpoint]}
       osm: {tags: {tourism: viewpoint}, context_radius_m: 1000, dedupe_radius_m: 80}
 
-  # --- Telttailu ----------------------------------------------------------
+  # --- Camping -----------------------------------------------------------
   telttapaikka:
     label: {fi: Telttapaikka, en: Tent site}
     tag: {fi: telttapaikka, en: tentsite}
@@ -126,7 +128,7 @@ kinds:
         context_radius_m: 2000
         dedupe_radius_m: 120
 
-  # --- Käymälät -----------------------------------------------------------
+  # --- Toilets -----------------------------------------------------------
   kaymala:
     label: {fi: Käymälä, en: Toilet}
     tag: {fi: kaymala, en: toilet}
@@ -137,7 +139,7 @@ kinds:
       loi: {types: [dry-toilet, wc]}
       osm: {tags: {amenity: toilets}}
 
-  # --- Opasteet -----------------------------------------------------------
+  # --- Info points ---------------------------------------------------------
   luontokeskus:
     label: {fi: Luontokeskus, en: Nature centre}
     tag: {fi: luontokeskus, en: naturecentre}
@@ -156,7 +158,7 @@ kinds:
       lipas: {type_codes: [207]}
       loi: {types: [information-board]}
 
-  # --- Muut ---------------------------------------------------------------
+  # --- Other ---------------------------------------------------------------
   puuvaja:
     label: {fi: Puuvaja, en: Woodshed}
     tag: {fi: puuvaja, en: woodshed}
@@ -196,8 +198,8 @@ kinds:
     sources:
       loi: {types: [parking-spot]}
 
-  # --- Reitit -------------------------------------------------------------
-  # Samankaltaiset reitit samalla värillä (päätös 7).
+  # --- Routes -------------------------------------------------------------
+  # Similar routes share a colour.
   luontopolku:
     label: {fi: Luontopolku, en: Nature trail}
     tag: {fi: luontopolku, en: naturetrail}
@@ -233,7 +235,7 @@ kinds:
     color: "#1F6FD1"
     sources:
       lipas: {type_codes: [4451, 4452]}
-  # Kävely-/ulkoilureitit (4403) ovat usein lähiliikuntaa, joten oletuksena pois.
+  # Walking/outdoor routes (4403) are often neighbourhood exercise routes: disabled by default.
   ulkoilureitti:
     enabled: false
     label: {fi: Ulkoilureitti, en: Outdoor route}

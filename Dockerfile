@@ -17,7 +17,7 @@ RUN useradd --system --uid 10001 lipas && mkdir -p /data && chown lipas /data
 USER lipas
 VOLUME ["/data"]
 
-# Oletus: ajo heti ja sitten 7 päivän välein. Kertaluonteinen ajo:
+# Default: run immediately and then every 7 days. One-off run:
 #   docker run --rm -v ./data:/data IMAGE run
 ENTRYPOINT ["lipas2tak", "--config", "/app/config/config.yaml", "--types", "/app/config/types.yaml"]
 CMD ["schedule", "--every-days", "7"]

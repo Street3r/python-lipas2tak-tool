@@ -472,8 +472,8 @@ def render_index_html(index: dict) -> str:
         "td,th{border-bottom:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}"
         "td a{margin-right:.6em;white-space:nowrap}code{font-size:.85em;color:#555;word-break:break-all}"
         ".note{background:#f4f6f8;padding:8px 12px;border-radius:6px}</style>"
-        f"<h1>Lipas → TAK</h1><p>Data checked {escape(index['generated'][:16].replace('T', ' '))} UTC"
-        + (f", next check {escape(index['next_check'][:10])}" if index.get("next_check") else "") + ". "
+        f"<h1>Lipas → TAK</h1><p>Data checked {escape(index['generated'][:10])}"
+        + (f", next check expected {escape(index['next_check'][:10])}" if index.get("next_check") else "") + ". "
         f"Icon set (install once): <a href='{escape(index['iconset'])}'>lipas2tak_iconset.zip</a></p>"
         + (("<p><b>QR codes / share pages:</b> " + " · ".join(
             f"<a href='{escape(pages[0])}'>{escape(LANG_NAMES.get(lang, lang))}</a>"

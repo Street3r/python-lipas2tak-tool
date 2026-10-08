@@ -66,6 +66,8 @@ def _summary(res: dict) -> None:
     for e in idx["areas"]:
         total = sum(e["counts"].values())
         print(f"  [{e['lang']}] {e['key']}: {total} features -> {', '.join(sorted(e['files']))}")
+    for lang, links in (idx.get("links") or {}).items():
+        print(f"  KML network links [{lang}]: {', '.join(sorted(links.values()))}")
     if res["changes"]:
         print("Changes since the previous run:")
         for k, v in res["changes"].items():

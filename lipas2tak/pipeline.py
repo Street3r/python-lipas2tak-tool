@@ -233,7 +233,7 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                     p = d / f"{stem}_{group}.kmz"
                     kml.write_kmz(p, gname, [folder], icon_styles, line_styles, icons_dir)
                     files[f"kmz_{group}"] = str(p.relative_to(out_root))
-                    if outs.get("network_link", True):
+                    if outs.get("network_link", True) and outs.get("network_link_per_group", False):
                         nl = d / f"{stem}_{group}.kml"
                         kml.write_network_link(nl, gname, f"{base_url}/{files[f'kmz_{group}']}",
                                                outs.get("network_link_refresh_s", 86400))
@@ -283,6 +283,8 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
             continue
         index_areas.extend(write_area(settings, area, sel, all_areas, staging, now))
 
+    links = write_link_collections(settings, index_areas, staging)
+
     index = {
         "generated": now.isoformat(),
         "public_base_url": settings.get("public_base_url"),
@@ -291,6 +293,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         "license": attribution.LICENSE_ID,
         "license_url": attribution.LICENSE_URL,
         "attribution": attribution.ATTRIBUTION,
+        "links": links,
         "areas": index_areas,
     }
     (staging / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -308,6 +311,45 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         shutil.rmtree(old)
     log.info("Done: %d areas, %d features", len({e['key'] for e in index_areas}), len(feats))
     return {"index": index, "changes": changes, "features": len(feats)}
+
+
+def _category_title(settings: Settings, category: str, lang: str) -> str:
+    title = settings.get("areas", category, "title", default=None) or {}
+    return title.get(lang) or category
+
+
+def write_link_collections(settings: Settings, entries: list[dict], out_root: Path) -> dict:
+    """Top-level KML files with network links to every area's KMZ.
+
+    Per language: lipas2tak_<lang>.kml (all categories, one folder each) and
+    <category>_<lang>.kml (one category). Returns {lang: {"all"|category: path}}.
+    """
+    outs = settings.get("outputs") or {}
+    if not (outs.get("kmz", True) and outs.get("network_link", True) and outs.get("root_links", True)):
+        return {}
+    base_url = (settings.get("public_base_url") or "").rstrip("/")
+    refresh = outs.get("network_link_refresh_s", 86400)
+    visible_cfg = outs.get("root_links_visible") or {}
+    result: dict[str, dict[str, str]] = {}
+    for lang in settings.languages:
+        sections = []
+        for category in sorted({e["category"] for e in entries if e["lang"] == lang}):
+            items = sorted((e for e in entries if e["lang"] == lang and e["category"] == category
+                            and "kmz" in e["files"]), key=lambda e: e["name"])
+            if not items:
+                continue
+            links = [(e["name"], f"{base_url}/{e['files']['kmz']}") for e in items]
+            ctitle = _category_title(settings, category, lang)
+            visible = bool(visible_cfg.get(category, True))
+            sections.append((ctitle, visible, links))
+            path = out_root / f"{category}_{lang}.kml"
+            kml.write_link_collection(path, f"Lipas – {ctitle}", [(ctitle, visible, links)], refresh)
+            result.setdefault(lang, {})[category] = path.name
+        if sections:
+            path = out_root / f"lipas2tak_{lang}.kml"
+            kml.write_link_collection(path, "Lipas", sections, refresh)
+            result.setdefault(lang, {})["all"] = path.name
+    return result
 
 
 # --- Change tracking --------------------------------------------------------------
@@ -335,11 +377,27 @@ def diff_state(state_path: Path, entries: list[dict], now: datetime) -> dict:
     return changes
 
 
+LANG_NAMES = {"fi": "Suomi", "en": "English"}
+
+
 def render_index_html(index: dict) -> str:
     from html import escape
     base = (index.get("public_base_url") or "").rstrip("/")
+
+    def url(rel: str) -> str:
+        return f"{base}/{rel}" if base else rel
+
+    link_rows = []
+    for lang, links in sorted((index.get("links") or {}).items()):
+        items = []
+        for key, rel in sorted(links.items(), key=lambda kv: (kv[0] != "all", kv[0])):
+            label = "All areas" if key == "all" else key
+            items.append(f"<li><a href='{escape(rel)}'>{escape(label)}</a> "
+                         f"<code>{escape(url(rel))}</code></li>")
+        link_rows.append(f"<h3>{escape(LANG_NAMES.get(lang, lang))}</h3><ul>{''.join(items)}</ul>")
+
     rows = []
-    for e in sorted(index["areas"], key=lambda e: (e["lang"], e["category"], e["slug"])):
+    for e in sorted(index["areas"], key=lambda e: (e["lang"], e["category"], e["name"])):
         links = " ".join(f'<a href="{escape(v)}">{escape(k)}</a>' for k, v in sorted(e["files"].items()))
         total = sum(e["counts"].values())
         rows.append(f"<tr><td>{escape(e['lang'])}</td><td>{escape(e['category'])}</td>"
@@ -348,12 +406,24 @@ def render_index_html(index: dict) -> str:
         "<!doctype html><html lang='en'><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<title>Lipas → TAK</title>"
-        "<style>body{font-family:system-ui,sans-serif;margin:16px}table{border-collapse:collapse;width:100%}"
+        "<style>body{font-family:system-ui,sans-serif;margin:16px;max-width:1100px}"
+        "table{border-collapse:collapse;width:100%}"
         "td,th{border-bottom:1px solid #ddd;padding:4px 6px;text-align:left;vertical-align:top}"
-        "a{margin-right:.6em;white-space:nowrap}</style>"
+        "td a{margin-right:.6em;white-space:nowrap}code{font-size:.85em;color:#555;word-break:break-all}"
+        ".note{background:#f4f6f8;padding:8px 12px;border-radius:6px}</style>"
         f"<h1>Lipas → TAK</h1><p>Updated {escape(index['generated'])}. "
-        f"Icon set: <a href='{escape(index['iconset'])}'>lipas2tak_iconset.zip</a>. "
-        f"Base URL for KML network links: {escape(base)}</p>"
+        f"Icon set (install once): <a href='{escape(index['iconset'])}'>lipas2tak_iconset.zip</a></p>"
+        "<h2>KML network links</h2>"
+        "<p><b>ATAK:</b> Import → <i>KML Link</i> → paste one of the URLs below and turn on auto refresh "
+        "(e.g. 86400 s). The areas appear as child links in Overlay Manager → Network Resources, "
+        "where they can be switched on and off. A single area works the same way with its "
+        "<i>kmz</i> URL from the table below. "
+        "<b>WinTAK / Google Earth:</b> open the <code>.kml</code> file.</p>"
+        + "".join(link_rows) +
+        "<p class='note'>KML/KMZ layers are overlays: good for an overview without a server, "
+        "but routes are plain lines and hashtag search does not cover them. For navigable routes and "
+        "hashtag filtering use the data packages (<i>datapackage</i>) or TAK Server Data Sync.</p>"
+        "<h2>All files</h2>"
         "<table><tr><th>Lang</th><th>Type</th><th>Area</th><th>Features</th><th>Files</th></tr>"
         + "".join(rows) + "</table>"
         f"<p><small>Data licence: <a href='{escape(index['license_url'])}'>ODbL 1.0</a>. "

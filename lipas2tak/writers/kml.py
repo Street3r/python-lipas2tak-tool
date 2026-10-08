@@ -95,6 +95,33 @@ def write_network_link(path: Path, name: str, href: str, refresh_s: int) -> None
     path.write_text(doc, encoding="utf-8")
 
 
+def write_link_collection(path: Path, name: str, sections: list[tuple[str, bool, list[tuple[str, str]]]],
+                          refresh_s: int) -> None:
+    """One KML file with a folder per section and a NetworkLink per area.
+
+    sections: [(folder name, visible, [(area name, KMZ href)])]. With
+    visible=False the links are off by default and the user turns on the
+    areas they need (whether the client defers fetching depends on the client).
+    """
+    def link(n: str, href: str, vis: int) -> str:
+        return (f"<NetworkLink><name>{escape(n)}</name><visibility>{vis}</visibility>"
+                f"<refreshVisibility>0</refreshVisibility>"
+                f"<Link><href>{escape(href)}</href><refreshMode>onInterval</refreshMode>"
+                f"<refreshInterval>{int(refresh_s)}</refreshInterval></Link></NetworkLink>")
+
+    body = []
+    for folder, visible, links in sections:
+        vis = 1 if visible else 0
+        body.append(f"<Folder><name>{escape(folder)}</name><visibility>{vis}</visibility>"
+                    + "".join(link(n, h, vis) for n, h in links) + "</Folder>")
+    doc = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
+           f"<name>{escape(name)}</name><description>{escape(attribution.SHORT)}</description>"
+           + "".join(body) + "</Document></kml>\n")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(doc, encoding="utf-8")
+
+
 def _find(dirs, name: str) -> Path:
     """First directory containing the icon (a Path or a list of Paths)."""
     for d in (dirs if isinstance(dirs, (list, tuple)) else [dirs]):

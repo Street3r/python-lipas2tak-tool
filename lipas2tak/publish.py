@@ -112,13 +112,18 @@ def _changelog(old: str, now: datetime, changes: dict, n_features: int) -> str:
 
 def publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, branch: str, base_url: str,
             repo_name: str = "finland-outdoor-tak-data", dry_run: bool = False,
-            now: Optional[datetime] = None) -> str:
+            now: Optional[datetime] = None, source_status: Optional[Path] = None) -> str:
     """Build the public version and push it if anything changed. Returns a status string."""
     now = now or datetime.now(timezone.utc)
     workdir.mkdir(parents=True, exist_ok=True)
     pub = public_settings(settings, workdir, base_url)
     raw = pipeline.RawData.load(raw_dir)
-    res = pipeline.run(pub, raw, now=now)
+    # Next scheduled check comes from the generator's own status file
+    next_check = None
+    if source_status and source_status.exists():
+        nc = json.loads(source_status.read_text(encoding="utf-8")).get("next_check")
+        next_check = datetime.fromisoformat(nc) if nc else None
+    res = pipeline.run(pub, raw, now=now, next_check=next_check)
     out = pub.path("output")
 
     repo = workdir / "repo"
@@ -178,7 +183,7 @@ def watch(settings: Settings, source_index: Path, interval_s: float, **kw) -> No
                 last = marker.read_text(encoding="utf-8").strip() if marker.exists() else ""
                 if generated and generated != last:
                     log.info("New generator output (%s), publishing", generated)
-                    publish(settings, **kw)
+                    publish(settings, source_status=source_index.parent / "status.json", **kw)
                     marker.write_text(generated, encoding="utf-8")
             else:
                 log.info("Waiting for generator output: %s", source_index)

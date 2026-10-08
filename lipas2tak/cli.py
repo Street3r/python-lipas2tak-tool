@@ -34,12 +34,12 @@ def cmd_build(args) -> int:
     return 0
 
 
-def cmd_run(args) -> int:
+def cmd_run(args, next_check=None) -> int:
     s = _settings(args)
     raw = pipeline.fetch_raw(s, normalize.Classifier(s))
     if args.dump:
         raw.dump(Path(args.dump))
-    res = pipeline.run(s, raw, only=args.only)
+    res = pipeline.run(s, raw, only=args.only, next_check=next_check)
     _summary(res)
     return 0
 
@@ -68,7 +68,7 @@ def cmd_schedule(args) -> int:
     while True:
         start = datetime.now(timezone.utc)
         try:
-            cmd_run(args)
+            cmd_run(args, next_check=start + interval)
         except Exception:  # pragma: no cover - the scheduler keeps going after errors
             log.exception("Run failed; retrying in 6 h")
             time.sleep(6 * 3600)

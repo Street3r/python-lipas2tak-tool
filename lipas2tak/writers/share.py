@@ -51,6 +51,7 @@ TEXT = {
         "search": "Search areas…",
         "updated": "updated",
         "checked": "Data checked",
+        "next_check": "next check",
         "checked_note": "Each area shows the date of its latest change.",
         "search_all": "Find an area",
         "sort": "Sort",
@@ -86,6 +87,7 @@ TEXT = {
         "search": "Hae aluetta…",
         "updated": "päivitetty",
         "checked": "Tiedot tarkistettu",
+        "next_check": "seuraava tarkistus",
         "checked_note": "Alueen kohdalla näkyy sen viimeisimmän muutoksen päivä.",
         "search_all": "Etsi alue",
         "sort": "Järjestys",
@@ -174,6 +176,10 @@ fetch('../../status.json', {cache: 'no-store'}).then(r => r.json()).then(s => {
   const d = new Date(s.checked), loc = document.documentElement.lang === 'en' ? 'en-GB' : 'fi-FI';
   document.getElementById('checked').textContent =
     d.toLocaleDateString(loc) + ' ' + d.toLocaleTimeString(loc, {hour: '2-digit', minute: '2-digit'});
+  if (s.next_check) {
+    document.getElementById('next').textContent = new Date(s.next_check).toLocaleDateString(loc);
+    document.getElementById('next-wrap').hidden = false;
+  }
   document.getElementById('checked-line').hidden = false;
 }).catch(() => {});
 </script>"""
@@ -214,7 +220,8 @@ def _page(lang: str, title: str, body: str, nav: str, attribution: list[str], li
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         f"<title>{escape(title)}</title><style>{CSS}</style><body>"
         f"<nav>{nav}</nav>"
-        f"<p class='muted' id='checked-line' hidden>{escape(t['checked'])}: <b id='checked'></b>. "
+        f"<p class='muted' id='checked-line' hidden>{escape(t['checked'])}: <b id='checked'></b>"
+        f"<span id='next-wrap' hidden>, {escape(t['next_check'])} <b id='next'></b></span>. "
         f"{escape(t['checked_note'])}</p>{body}"
         + CHECKED_JS
         + f"<footer>{escape(t['licence'])}: <a href='{escape(licence_url)}'>ODbL 1.0</a> · "

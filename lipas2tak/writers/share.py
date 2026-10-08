@@ -48,6 +48,13 @@ TEXT = {
         "catalogue": "All files",
         "kml_note": "KML layers are an overview: routes are plain lines and hashtag search does not cover them.",
         "licence": "Data licence",
+        "search": "Search areas…",
+        "search_all": "Find an area",
+        "sort": "Sort",
+        "sort_name": "Name A–Z",
+        "sort_most": "Most features",
+        "sort_least": "Fewest features",
+        "no_results": "No matching areas.",
         "no_qr": "",
     },
     "fi": {
@@ -73,6 +80,13 @@ TEXT = {
         "catalogue": "Kaikki tiedostot",
         "kml_note": "KML-tasot ovat yleiskuva: reitit näkyvät viivoina, eikä hashtag-haku löydä niitä.",
         "licence": "Aineiston lisenssi",
+        "search": "Hae aluetta…",
+        "search_all": "Etsi alue",
+        "sort": "Järjestys",
+        "sort_name": "Nimi A–Ö",
+        "sort_most": "Eniten kohteita",
+        "sort_least": "Vähiten kohteita",
+        "no_results": "Ei hakua vastaavia alueita.",
         "no_qr": "",
     },
 }
@@ -92,7 +106,65 @@ CSS = (
     "text-decoration:none;font-size:.9em;margin:2px 4px 2px 0}"
     ".dl a{margin-right:10px;font-size:.9em}code{font-size:.8em;word-break:break-all;color:var(--muted)}"
     "footer{margin-top:2em;font-size:.8em;color:var(--muted)}"
+    ".tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0;position:sticky;top:0;"
+    "background:var(--bg);padding:8px 0;z-index:1}"
+    ".tools input,.tools select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--muted);"
+    "background:var(--card);color:var(--fg)}.tools input{flex:1;min-width:200px}"
+    ".card:target{outline:3px solid var(--accent)}.hits{list-style:none;padding:0;margin:6px 0;columns:2 220px}"
+    ".hits li{margin:3px 0}[hidden]{display:none!important}"
 )
+
+
+# Client-side search and sort; the page works without it (all areas shown)
+SEARCH_JS = """<script>
+(function(){
+  const norm = s => s.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+  const q = document.getElementById('q'), sort = document.getElementById('sort');
+  const grid = document.getElementById('areas'), none = document.getElementById('none');
+  const items = Array.from(document.querySelectorAll('[data-search]'));
+  function apply(){
+    const words = norm(q.value).split(/\\s+/).filter(Boolean);
+    let shown = 0;
+    items.forEach(el => {
+      const ok = words.every(w => el.dataset.search.includes(w));
+      el.hidden = !ok; if (ok) shown++;
+    });
+    if (none) none.hidden = shown > 0 || !words.length && !items.length;
+    if (sort && grid) {
+      const key = sort.value;
+      const cards = items.filter(el => el.parentNode === grid);
+      cards.sort((a,b) => key === 'name' ? a.dataset.name.localeCompare(b.dataset.name, document.documentElement.lang)
+        : (key === 'most' ? b.dataset.count - a.dataset.count : a.dataset.count - b.dataset.count));
+      cards.forEach(c => grid.appendChild(c));
+    }
+  }
+  q.addEventListener('input', apply); if (sort) sort.addEventListener('change', apply);
+  const p = new URLSearchParams(location.search).get('q'); if (p) { q.value = p; }
+  apply();
+})();
+</script>"""
+
+
+# Start page: list matches only while something is typed
+START_SEARCH_JS = """<script>
+(function(){
+  const norm = s => s.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+  const q = document.getElementById('q'), none = document.getElementById('none');
+  const items = Array.from(document.querySelectorAll('.hits [data-search]'));
+  q.addEventListener('input', () => {
+    const words = norm(q.value).split(/\\s+/).filter(Boolean);
+    let shown = 0;
+    items.forEach(el => { const ok = words.length > 0 && words.every(w => el.dataset.search.includes(w));
+                          el.hidden = !ok; if (ok) shown++; });
+    none.hidden = !words.length || shown > 0;
+  });
+})();
+</script>"""
+
+
+def _norm(s: str) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", s) if not unicodedata.combining(c)).lower()
 
 
 def atak_uri(url: str) -> str:
@@ -177,7 +249,16 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
                         f"<p class='muted'>{escape(t['kml_note'])}</p><div class='grid'>{''.join(cards)}</div>")
         cat_links = " · ".join(
             f"<a href='{c}.html'>{escape(category_titles.get(c, {}).get(lang, c))}</a>" for c in categories)
-        body.append(f"<h2>{escape(t['step3'])}</h2><p>{escape(t['step3_text'])}</p><p>{cat_links}</p>")
+        hits = "".join(
+            f"<li data-search='{escape(_norm(e['name'] + ' ' + e['slug'] + ' ' + e['tag']))}' hidden>"
+            f"<a href='{e['category']}.html#{escape(e['slug'])}'>{escape(e['name'])}</a> "
+            f"<span class='muted'>· {escape(category_titles.get(e['category'], {}).get(lang, e['category']))}</span></li>"
+            for e in sorted(entries, key=lambda e: e["name"]))
+        body.append(f"<h2>{escape(t['step3'])}</h2><p>{escape(t['step3_text'])}</p><p>{cat_links}</p>"
+                    f"<div class='tools'><input id='q' type='search' placeholder='{escape(t['search'])}' "
+                    f"aria-label='{escape(t['search_all'])}' autocomplete='off'></div>"
+                    f"<ul class='hits'>{hits}</ul><p id='none' class='muted' hidden>{escape(t['no_results'])}</p>"
+                    + START_SEARCH_JS)
         (d / "index.html").write_text(
             _page(lang, t["title"], "".join(body), nav("index"), index["attribution"], index["license_url"]),
             encoding="utf-8")
@@ -198,13 +279,22 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
                 dls = [f"<a href='{escape(url(files[k]))}'>{label}</a>"
                        for k, label in (("datapackage", ".zip"), ("kmz", ".kmz"), ("network_link", ".kml"),
                                         ("gpx_zip", "GPX")) if k in files]
+                search = _norm(f"{e['name']} {e['slug']} {e['tag']}")
                 cards.append(
-                    f"<div class='card' id='{escape(e['slug'])}'><h3>{escape(e['name'])}</h3>"
+                    f"<div class='card' id='{escape(e['slug'])}' data-search='{escape(search)}' "
+                    f"data-name='{escape(e['name'])}' data-count='{total}'><h3>{escape(e['name'])}</h3>"
                     f"<span class='muted'>{total} {escape(t['features'])} · #{escape(e['tag'])}</span>"
                     f"<div class='qrs'>{''.join(qrs)}</div>"
                     f"<p class='dl'>{escape(t['downloads'])}: {''.join(dls)}</p></div>")
-            body = (f"<h1>{escape(ctitle)}</h1><p class='muted'>{escape(t['intro'])}</p>"
-                    f"<div class='grid'>{''.join(cards)}</div>")
+            tools = (f"<div class='tools'><input id='q' type='search' placeholder='{escape(t['search'])}' "
+                     f"aria-label='{escape(t['search'])}' autocomplete='off'>"
+                     f"<select id='sort' aria-label='{escape(t['sort'])}'>"
+                     f"<option value='name'>{escape(t['sort_name'])}</option>"
+                     f"<option value='most'>{escape(t['sort_most'])}</option>"
+                     f"<option value='least'>{escape(t['sort_least'])}</option></select></div>")
+            body = (f"<h1>{escape(ctitle)}</h1><p class='muted'>{escape(t['intro'])}</p>{tools}"
+                    f"<div class='grid' id='areas'>{''.join(cards)}</div>"
+                    f"<p id='none' class='muted' hidden>{escape(t['no_results'])}</p>{SEARCH_JS}")
             (d / f"{c}.html").write_text(
                 _page(lang, f"{ctitle} – {t['title']}", body, nav(c), index["attribution"], index["license_url"]),
                 encoding="utf-8")

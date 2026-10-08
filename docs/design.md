@@ -69,10 +69,11 @@ Statistics Fin. ─┘        (generator)                 │
 
 - National parks are Lipas type 111 (41 parks). Nuuksio = Lipas id 606198.
 - Many sites and main trails maintained by Metsähallitus are missing from Lipas (e.g. most lean-tos and the main trails in Nuuksio). OpenStreetMap is used to fill gaps for shelters, fire places, towers and toilets.
-- The LOI API contains toilets (`dry-toilet` ≈ 216 nationwide) and some test data (filtered by name and status).
+- The LOI API contains toilets (`dry-toilet` ≈ 180 nationwide) and some test data (filtered by name and status).
 - Type code 205 is not in use; landing spots come from LOIs (`landing-spot`).
 - The type code / source for state hiking areas is still to be determined.
-- First full run: about 8,500 Lipas sites, 1,050 LOIs, 41 parks, 19 regions. Fetching takes about 1.5 min and processing about 1–2 min.
+- Full run (October 2026): about 8,500 Lipas sites, 1,050 LOIs and ~17,000 OSM elements → ~25,500 features in 58 areas (41 parks, 19 regions; Linnansaari and Perämeri currently have no features). Lipas fetch ~1 min; OSM fetch 1–15 min depending on how busy Overpass is; processing ~4 min.
+- Public Overpass servers often answer 504/429: retries with longer waits, fallback servers and the previous cached result are used (`sources.osm.overpass_fallback_urls`).
 
 ## ATAK test checklist
 

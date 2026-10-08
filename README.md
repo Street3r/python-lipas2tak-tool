@@ -13,6 +13,7 @@ Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipa
 | `iconset/lipas2tak_iconset.zip` | icon set, installed once |
 | `share/<lang>/*.html` | share pages: QR codes and "open in ATAK" links, one page per category and language |
 | `index.json` / `index.html` | catalogue of outputs for feeders and people |
+| `status.json` | time of the last check and the next scheduled one (shown on the pages) |
 
 Routes are navigable ATAK routes (`b-m-r`); rest stops along a route are named waypoints. Marker `remarks` contain a description, services and hashtags (`#laavu #nuuksio #uusimaa`) that can be used to filter the view in ATAK. Route remarks contain length, trail marking, accessibility and a description.
 
@@ -74,7 +75,7 @@ ATAK (4.2.1+) adds network links via **Import → KML Link**: give a name, paste
 - A single area: `<base url>/fi/kansallispuistot/nuuksio/nuuksio_fi.kmz`.
 - WinTAK and Google Earth: open the `.kml` file.
 
-The URLs must stay stable, so the files are served from your own web server (nginx in docker-lipas-integration). Dropbox or Google Drive share links, often used for this in TAK tutorials, work for single hand-uploaded files, but every file gets its own unpredictable link, so they don't suit a generated set of ~120 KMZ files referencing each other.
+The URLs must stay stable, so the files are served from your own web server (nginx in docker-lipas-integration) or GitHub Pages (`lipas2tak publish`). Dropbox or Google Drive share links, often used for this in TAK tutorials, work for single hand-uploaded files, but every file gets its own unpredictable link, so they don't suit a generated set of ~120 KMZ files referencing each other.
 
 ### Share pages and QR codes
 
@@ -82,7 +83,7 @@ The URLs must stay stable, so the files are served from your own web server (ngi
 
 ### Publishing
 
-`lipas2tak publish` builds a public version from saved raw data (always the default icon set, public base URL, no per-group KMZ files) and force-pushes it as a single commit to a git branch, e.g. one served by GitHub Pages. Nothing is pushed when only the run time changed: outputs are deterministic (fixed zip timestamps; CoT times record when an item's content last changed).
+`lipas2tak publish` builds a public version from saved raw data (always the default icon set, public base URL, no per-group KMZ files) and force-pushes it as a single commit to a git branch, e.g. one served by GitHub Pages. Outputs are deterministic (fixed zip timestamps; CoT times record when an item's content last changed), so unchanged files stay byte-identical. When no data changed, only the check time (`status.json`, index files) is updated and no changelog entry is added. If a large push is cut off, files are uploaded in batches to a temporary branch first.
 
 Data package UIDs change whenever the package content changes (uuid5 of area key + content hash), because TAK clients skip a package UID they have already imported. Unchanged content keeps its UID, so re-imports are skipped. With `--watch <index.json>` it publishes after every generator run. See docker-lipas-integration for the container setup.
 

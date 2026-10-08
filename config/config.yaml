@@ -102,4 +102,5 @@ outputs:
     kansallispuistot: true
     maakunnat: false
   gpx: true
+  share_pages: true          # share/<lang>/*.html with QR codes (needs public_base_url)
   network_link_refresh_s: 86400

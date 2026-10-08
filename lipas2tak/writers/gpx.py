@@ -10,6 +10,7 @@ from xml.sax.saxutils import escape
 
 from .. import attribution
 from ..geo import Line
+from . import ziputil
 
 HEADER = ('<?xml version="1.0" encoding="UTF-8"?>\n'
           '<gpx version="1.1" creator="python-lipas2tak-tool" '
@@ -42,5 +43,5 @@ def write_zip(path: Path, files: list[tuple[str, str]]) -> None:
     tmp = path.with_suffix(".tmp")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
         for name, content in files:
-            z.writestr(name, content)
+            ziputil.writestr(z, name, content)
     tmp.replace(path)

@@ -34,7 +34,7 @@ def _fmt(v: float) -> str:
 
 
 def marker(uid: str, cot_type: str, lat: float, lon: float, callsign: str, remarks: str,
-           iconsetpath: str | None, now: datetime | None = None, stale_days: int = 365) -> str:
+           iconsetpath: str | None, now: datetime | None = None, stale_days: int = 3650) -> str:
     now = now or datetime.now(timezone.utc)
     icon = f"<usericon iconsetpath={quoteattr(iconsetpath)}/>" if iconsetpath else ""
     return (
@@ -50,7 +50,7 @@ def marker(uid: str, cot_type: str, lat: float, lon: float, callsign: str, remar
 
 
 def polyline(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
-             stroke_weight: float = 4.0, now: datetime | None = None, stale_days: int = 365,
+             stroke_weight: float = 4.0, now: datetime | None = None, stale_days: int = 3650,
              link_hae: bool = False) -> str:
     """Drawn line (u-d-f). `line` is [(lon, lat), ...]."""
     now = now or datetime.now(timezone.utc)
@@ -78,7 +78,7 @@ def polyline(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
 def route(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
           start_name: str, end_name: str, stroke_weight: float = 3.0,
           method: str = "Walking", route_kind: str = "On Foot",
-          now: datetime | None = None, stale_days: int = 365,
+          now: datetime | None = None, stale_days: int = 3650,
           waypoints: dict[int, tuple[str, str]] | None = None) -> str:
     """Navigable ATAK route (b-m-r).
 

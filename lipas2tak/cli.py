@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -40,6 +41,23 @@ def cmd_run(args) -> int:
         raw.dump(Path(args.dump))
     res = pipeline.run(s, raw, only=args.only)
     _summary(res)
+    return 0
+
+
+def cmd_publish(args) -> int:
+    from . import publish
+    s = _settings(args)
+    missing = [n for n, v in (("--repo/PUBLISH_REPO", args.repo), ("--base-url/PUBLISH_BASE_URL", args.base_url))
+               if not v]
+    if missing:
+        print("Missing: " + ", ".join(missing), file=sys.stderr)
+        return 2
+    kw = dict(raw_dir=Path(args.raw), workdir=Path(args.workdir), repo_url=args.repo, branch=args.branch,
+              base_url=args.base_url, repo_name=args.repo_name, dry_run=args.dry_run)
+    if args.watch:
+        publish.watch(s, Path(args.watch), args.interval, **kw)
+        return 0
+    print(publish.publish(s, **kw))
     return 0
 
 
@@ -101,6 +119,19 @@ def main(argv=None) -> int:
     sc.add_argument("--only", nargs="*")
     sc.add_argument("--dump")
     sc.set_defaults(func=cmd_schedule)
+
+    pb = sub.add_parser("publish", help="build the public version and push it to a git branch")
+    pb.add_argument("--raw", required=True, help="raw data directory (from --dump)")
+    pb.add_argument("--workdir", default="data/publish", help="build and git working directory")
+    pb.add_argument("--repo", default=os.environ.get("PUBLISH_REPO"), help="git URL (env PUBLISH_REPO)")
+    pb.add_argument("--branch", default=os.environ.get("PUBLISH_BRANCH", "data"))
+    pb.add_argument("--base-url", default=os.environ.get("PUBLISH_BASE_URL"),
+                    help="public URL of the branch, e.g. GitHub Pages (env PUBLISH_BASE_URL)")
+    pb.add_argument("--repo-name", default=os.environ.get("PUBLISH_REPO_NAME", "finland-outdoor-tak-data"))
+    pb.add_argument("--watch", help="generator index.json; publish whenever it changes")
+    pb.add_argument("--interval", type=float, default=600, help="watch interval in seconds")
+    pb.add_argument("--dry-run", action="store_true", help="build and commit locally, do not push")
+    pb.set_defaults(func=cmd_publish)
 
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,

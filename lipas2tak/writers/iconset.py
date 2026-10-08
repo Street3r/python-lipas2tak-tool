@@ -13,6 +13,7 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
+from . import ziputil
 
 ICONSET_UID = "3c1f9a52-8d0e-4c41-9b0a-1a2d5e7f4b61"
 ICONSET_GROUP = "Retkeily"
@@ -34,11 +35,11 @@ def write(path: Path, icons_dir, icons: list[str], cot_type: str = "a-u-G") -> N
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("iconset.xml", xml)
+        ziputil.writestr(z, "iconset.xml", xml)
         for i in sorted(set(icons)):
             src = _find(icons_dir, i)
             if src.exists():
-                z.write(src, f"{ICONSET_GROUP}/{i}")
+                ziputil.writefile(z, src, f"{ICONSET_GROUP}/{i}")
     tmp.replace(path)
 
 

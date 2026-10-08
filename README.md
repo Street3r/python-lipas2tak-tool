@@ -11,6 +11,7 @@ Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipa
 | `links/all_<lang>.kml`, `links/<category>_<lang>.kml` | one network link file covering all areas, a folder per category |
 | `*_gpx.zip` (`<rte>`) | routes that ATAK converts into navigable routes |
 | `iconset/lipas2tak_iconset.zip` | icon set, installed once |
+| `share/<lang>/*.html` | share pages: QR codes and "open in ATAK" links, one page per category and language |
 | `index.json` / `index.html` | catalogue of outputs for feeders and people |
 
 Routes are navigable ATAK routes (`b-m-r`); rest stops along a route are named waypoints. Marker `remarks` contain a description, services and hashtags (`#laavu #nuuksio #uusimaa`) that can be used to filter the view in ATAK. Route remarks contain length, trail marking, accessibility and a description.
@@ -28,6 +29,7 @@ lipas2tak run --only nuuksio       # a single area (slug or key, e.g. kansallisp
 lipas2tak fetch --dump data/raw    # save the raw data
 lipas2tak build --raw data/raw     # build from saved raw data without network access
 lipas2tak schedule --every-days 7  # container mode: run now and then weekly
+lipas2tak publish --raw data/raw --repo <git url> --base-url <public url>   # public build to a git branch
 ```
 
 Docker:
@@ -54,6 +56,7 @@ data/output/
   links/all_<lang>.kml              network links to all areas
   links/kansallispuistot_<lang>.kml, links/maakunnat_<lang>.kml
   iconset/lipas2tak_iconset.zip
+  share/fi|en/index.html, kansallispuistot.html, maakunnat.html   QR codes
   fi|en/kansallispuistot|maakunnat/<slug>/
     <slug>_<lang>.zip               data package
     <slug>_<lang>.kmz / .kml         all features + network link
@@ -72,6 +75,14 @@ ATAK (4.2.1+) adds network links via **Import → KML Link**: give a name, paste
 - WinTAK and Google Earth: open the `.kml` file.
 
 The URLs must stay stable, so the files are served from your own web server (nginx in docker-lipas-integration). Dropbox or Google Drive share links, often used for this in TAK tutorials, work for single hand-uploaded files, but every file gets its own unpredictable link, so they don't suit a generated set of ~120 KMZ files referencing each other.
+
+### Share pages and QR codes
+
+`share/<lang>/` has a start page (icon set, all-areas network links) and one page per category with a QR code and an "open in ATAK" button for each area's data package and network link. They use ATAK's import URI `tak://com.atakmap.app/import?url=<percent-encoded URL>`; ATAK asks before importing. iTAK and WinTAK use the plain download links. QR codes need `segno` (installed with the package).
+
+### Publishing
+
+`lipas2tak publish` builds a public version from saved raw data (always the default icon set, public base URL, no per-group KMZ files) and force-pushes it as a single commit to a git branch, e.g. one served by GitHub Pages. Nothing is pushed when only the run time changed: outputs are deterministic (fixed zip timestamps; CoT times record when an item's content last changed). With `--watch <index.json>` it publishes after every generator run. See docker-lipas-integration for the container setup.
 
 More details: [docs/design.md](docs/design.md).
 

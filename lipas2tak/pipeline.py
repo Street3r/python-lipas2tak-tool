@@ -16,7 +16,7 @@ from .config import Settings, file_slug
 from .model import AreaDef, Feature
 from .sources import lipas, osm, regions
 from .sources.http import CachedClient
-from .writers import cot, datapackage, gpx, iconset, kml
+from .writers import cot, datapackage, gpx, iconset, kml, share
 
 log = logging.getLogger(__name__)
 
@@ -149,9 +149,26 @@ def _route_parts(f: Feature) -> list[tuple[str, list]]:
     return [(f"{f.uid}-{i}", l) for i, l in enumerate(f.lines, 1)]
 
 
+def _since(times: dict, key: str, digest: str, now: datetime) -> datetime:
+    """CoT time of an item: when its content last changed (kept in state.json).
+
+    Unchanged items keep their timestamp, so unchanged files stay byte-identical
+    between runs, and a changed item always gets a newer time.
+    """
+    prev = times.get(key)
+    if prev and prev[0] == digest:
+        return datetime.fromisoformat(prev[1])
+    times[key] = [digest, now.isoformat()]
+    return now
+
+
 def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_areas: dict[str, AreaDef],
-               out_root: Path, now: datetime) -> list[dict]:
-    """Write all outputs of one area in every language. Returns index entries."""
+               out_root: Path, now: datetime, times: Optional[dict] = None) -> list[dict]:
+    """Write all outputs of one area in every language. Returns index entries.
+
+    `times`: {"<area>/<lang>:<uid>": [digest, iso time]}, updated in place.
+    """
+    times = {} if times is None else times
     kinds = settings.kinds
     icons_dir = settings.icon_dirs()
     outs = settings.get("outputs") or {}
@@ -182,8 +199,10 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
             if f.is_route:
                 parts = _route_parts(f)
                 for uid, line in parts:
+                    digest = _digest(name + rem + repr(line) + repr(f.waypoints and [i for i, _ in f.waypoints]))
+                    t = _since(times, f"{area.key}/{lang}:{uid}", digest, now)
                     if route_format == "shape":
-                        xml = cot.polyline(uid, line, name, rem, k.color or "#FF0000", stroke, now=now)
+                        xml = cot.polyline(uid, line, name, rem, k.color or "#FF0000", stroke, now=t)
                     else:
                         wps = {i: (remarks.display_name(ws[0], kinds[ws[0].kind], lang),
                                    ", ".join(dict.fromkeys(kinds[w.kind].label.get(lang) or kinds[w.kind].label["fi"]
@@ -193,9 +212,9 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                                         start_name=f"{name} – {ENDPOINTS['start'][lang]}",
                                         end_name=f"{name} – {ENDPOINTS['end'][lang]}",
                                         stroke_weight=stroke, method=k.route_method,
-                                        route_kind=k.route_type, now=now)
+                                        route_kind=k.route_type, now=t)
                     cot_items.append((uid, name, xml))
-                    uid_digests[uid] = _digest(name + rem + repr(line))
+                    uid_digests[uid] = digest
                 line_styles[f"s-{k.key}"] = (k.color or "#FF0000", stroke)
                 folder.placemarks.append(kml.Placemark(f.uid, name, rem, f"s-{k.key}", lines=f.lines))
                 gkey = f.group_uid or f.uid
@@ -205,9 +224,11 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
             else:
                 assert f.point
                 path = iconset.iconsetpath(k.icon) if k.icon else None
-                xml = cot.marker(f.uid, k.cot_type, f.point[1], f.point[0], name, rem, path, now=now)
+                digest = _digest(name + rem + repr(f.point) + (path or ""))
+                t = _since(times, f"{area.key}/{lang}:{f.uid}", digest, now)
+                xml = cot.marker(f.uid, k.cot_type, f.point[1], f.point[0], name, rem, path, now=t)
                 cot_items.append((f.uid, name, xml))
-                uid_digests[f.uid] = _digest(name + rem + repr(f.point))
+                uid_digests[f.uid] = digest
                 if k.icon:
                     icon_styles[f"s-{k.key}"] = k.icon
                 folder.placemarks.append(kml.Placemark(f.uid, name, rem, f"s-{k.key}", point=f.point))
@@ -271,6 +292,8 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     used_icons = [k.icon for k in settings.enabled_kinds() if k.icon]
     iconset.write(staging / "iconset" / "lipas2tak_iconset.zip", settings.icon_dirs(), used_icons)
 
+    state_path = settings.path("cache") / "state.json"
+    times = _load_state(state_path).get("since", {})
     index_areas = []
     targets = [a for a in all_areas.values() if not only or a.key in only or a.slug in only]
     for area in sorted(targets, key=lambda a: (a.category, a.slug)):
@@ -281,7 +304,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         if not sel:
             log.info("%s: no features, skipped", area.key)
             continue
-        index_areas.extend(write_area(settings, area, sel, all_areas, staging, now))
+        index_areas.extend(write_area(settings, area, sel, all_areas, staging, now, times))
 
     links = write_link_collections(settings, index_areas, staging)
 
@@ -294,12 +317,17 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         "license_url": attribution.LICENSE_URL,
         "attribution": attribution.ATTRIBUTION,
         "links": links,
+        "share": {},
         "areas": index_areas,
     }
+    if (settings.get("outputs") or {}).get("share_pages", True):
+        titles = {c: (settings.get("areas", c, "title", default=None) or {})
+                  for c in {e["category"] for e in index_areas}}
+        index["share"] = share.write_share_pages(staging, index, titles, settings.languages)
     (staging / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
     (staging / "index.html").write_text(render_index_html(index), encoding="utf-8")
 
-    changes = diff_state(settings.path("cache") / "state.json", index_areas, now)
+    changes = diff_state(state_path, index_areas, now, times)
     # Atomic swap: old (removed) files disappear at the same time
     old = out_root.parent / (out_root.name + ".old")
     if old.exists():
@@ -354,12 +382,17 @@ def write_link_collections(settings: Settings, entries: list[dict], out_root: Pa
 
 # --- Change tracking --------------------------------------------------------------
 
-def diff_state(state_path: Path, entries: list[dict], now: datetime) -> dict:
+def _load_state(state_path: Path) -> dict:
+    if state_path.exists():
+        return json.loads(state_path.read_text(encoding="utf-8"))
+    return {}
+
+
+def diff_state(state_path: Path, entries: list[dict], now: datetime, times: Optional[dict] = None) -> dict:
     """Compare with the previous run (UID -> content digest) and store the new state."""
     cur = {f"{e['key']}/{e['lang']}": e["uids"] for e in entries}
-    prev = {}
-    if state_path.exists():
-        prev = json.loads(state_path.read_text(encoding="utf-8")).get("areas", {})
+    old_state = _load_state(state_path)
+    prev = old_state.get("areas", {})
     changes = {}
     for key in sorted(set(cur) | set(prev)):
         a, b = prev.get(key, {}), cur.get(key, {})
@@ -369,7 +402,11 @@ def diff_state(state_path: Path, entries: list[dict], now: datetime) -> dict:
         if added or removed or modified:
             changes[key] = {"added": added, "removed": removed, "modified": modified}
     state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(json.dumps({"generated": now.isoformat(), "areas": cur}), encoding="utf-8")
+    since = times if times is not None else old_state.get("since", {})
+    live = {f"{k}:{u}" for k, uids in cur.items() for u in uids}
+    since = {k: v for k, v in since.items() if k in live or k.split(":", 1)[0] not in cur}
+    state_path.write_text(json.dumps({"generated": now.isoformat(), "areas": cur, "since": since}),
+                          encoding="utf-8")
     log_path = state_path.parent / "changes.jsonl"
     with log_path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps({"generated": now.isoformat(), "changes": {
@@ -413,7 +450,10 @@ def render_index_html(index: dict) -> str:
         ".note{background:#f4f6f8;padding:8px 12px;border-radius:6px}</style>"
         f"<h1>Lipas → TAK</h1><p>Updated {escape(index['generated'])}. "
         f"Icon set (install once): <a href='{escape(index['iconset'])}'>lipas2tak_iconset.zip</a></p>"
-        "<h2>KML network links</h2>"
+        + (("<p><b>QR codes / share pages:</b> " + " · ".join(
+            f"<a href='{escape(pages[0])}'>{escape(LANG_NAMES.get(lang, lang))}</a>"
+            for lang, pages in sorted(index["share"].items())) + "</p>") if index.get("share") else "")
+        + "<h2>KML network links</h2>"
         "<p><b>ATAK:</b> Import → <i>KML Link</i> → paste one of the URLs below and turn on auto refresh "
         "(e.g. 86400 s). The areas appear as child links in Overlay Manager → Network Resources, "
         "where they can be switched on and off. A single area works the same way with its "

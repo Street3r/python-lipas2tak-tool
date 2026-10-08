@@ -8,6 +8,7 @@ from xml.sax.saxutils import escape, quoteattr
 
 from .. import attribution
 from ..geo import Coord, Line
+from . import ziputil
 
 
 def kml_color(hex_rgb: str, alpha: int = 255) -> str:
@@ -76,11 +77,11 @@ def write_kmz(path: Path, name: str, folders: list[Folder], icon_styles: dict[st
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("doc.kml", doc)
+        ziputil.writestr(z, "doc.kml", doc)
         for icon in sorted(used_icons):
             src = _find(icons_dir, icon)
             if src.exists():
-                z.write(src, f"files/{icon}")
+                ziputil.writefile(z, src, f"files/{icon}")
     tmp.replace(path)
 
 

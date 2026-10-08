@@ -12,6 +12,7 @@ import uuid
 import zipfile
 from pathlib import Path
 from xml.sax.saxutils import quoteattr
+from . import ziputil
 
 NAMESPACE = uuid.UUID("6b1c2b9e-1f55-4d0e-9c4a-6c2a3c5d2a10")
 
@@ -56,11 +57,11 @@ def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
     )
     tmp = path.with_suffix(".tmp")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("MANIFEST/manifest.xml", manifest)
+        ziputil.writestr(z, "MANIFEST/manifest.xml", manifest)
         for uid, _, xml in items:
-            z.writestr(f"{uid}/{uid}.cot", xml)
+            ziputil.writestr(z, f"{uid}/{uid}.cot", xml)
         for zpath, data in extra_files or []:
-            z.writestr(zpath, data)
+            ziputil.writestr(z, zpath, data)
         if notice:
-            z.writestr("ATTRIBUTION.txt", notice)
+            ziputil.writestr(z, "ATTRIBUTION.txt", notice)
     tmp.replace(path)

@@ -192,6 +192,35 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("<copyright", g)
         ET.fromstring(g)
 
+    def test_share_pages(self):
+        self.run_once()
+        out = self.tmp / "out"
+        idx = json.loads((out / "index.json").read_text())
+        self.assertEqual(idx["share"]["fi"][0], "share/fi/index.html")
+        page = (out / "share/en/kansallispuistot.html").read_text()
+        self.assertIn("Nuuksio", page)
+        self.assertIn("tak://com.atakmap.app/import?url=https%3A%2F%2Fexample.org%2Flipas2tak%2Fen%2F"
+                      "kansallispuistot%2Fnuuksio%2Fnuuksio_en.zip", page)
+        start = (out / "share/fi/index.html").read_text()
+        self.assertIn("links%2Fall_fi.kml", start)
+        self.assertIn("../en/index.html", start)       # language switch
+
+    def test_output_is_deterministic(self):
+        """A second run with unchanged data produces byte-identical files
+        (apart from the index files that carry the run time)."""
+        out = self.tmp / "out"
+
+        def snapshot():
+            return {str(p.relative_to(out)): p.read_bytes() for p in out.rglob("*") if p.is_file()}
+
+        pipeline.run(self.settings, self.raw, now=datetime(2026, 10, 7, tzinfo=timezone.utc))
+        first = snapshot()
+        pipeline.run(self.settings, self.raw, now=datetime(2026, 10, 14, 5, 30, tzinfo=timezone.utc))
+        second = snapshot()
+        self.assertEqual(set(first), set(second))
+        changed = sorted(k for k in first if first[k] != second[k])
+        self.assertEqual(changed, ["index.html", "index.json"])
+
     def test_network_link_collections(self):
         self.run_once()
         out = self.tmp / "out"

@@ -51,6 +51,23 @@ class GeoTests(unittest.TestCase):
         self.assertEqual(len(merged), 1)
         self.assertEqual(len(merged[0]), 3001)
 
+    def test_waypoint_clusters(self):
+        from lipas2tak import waypoints
+        from lipas2tak.model import Feature, Localized
+        line = [(24.50, 60.30), (24.52, 60.30), (24.54, 60.30)]
+        route = Feature(uid="r", source="t", source_id="r", kind="luontopolku", name=Localized("R"), lines=[line])
+        def pt(uid, kind, lon):
+            return Feature(uid=uid, source="t", source_id=uid, kind=kind, name=Localized(uid), point=(lon, 60.3002))
+        feats = [route, pt("nuotio", "nuotiopaikka", 24.5100), pt("laavu", "laavu", 24.5105),
+                 pt("teltta", "telttapaikka", 24.5110), pt("torni", "nakotorni", 24.5300)]
+        kg = {"luontopolku": "reitit", "nuotiopaikka": "tulentekopaikat", "laavu": "suojat",
+              "telttapaikka": "telttailu", "nakotorni": "nakotornit"}
+        waypoints.attach_waypoints(feats, kg, ["suojat", "tulentekopaikat", "telttailu", "nakotornit"],
+                                   radius_m=75, cluster_m=200)
+        self.assertEqual(len(route.waypoints), 2)                   # ryväs + torni
+        self.assertEqual(route.waypoints[0][1][0].uid, "laavu")     # suoja on ryppään edustaja
+        self.assertEqual({f.uid for f in route.waypoints[0][1]}, {"laavu", "nuotio", "teltta"})
+
     def test_merge_lines_loop(self):
         a = [(24.0, 60.0), (24.01, 60.0), (24.01, 60.01)]
         b = [(24.01, 60.01), (24.0, 60.01), (24.0, 60.0)]
@@ -134,6 +151,9 @@ class PipelineTests(unittest.TestCase):
         with zipfile.ZipFile(out / park["files"]["datapackage"]) as z:
             r = ET.fromstring(z.read("lipas-900020/lipas-900020.cot"))
         self.assertEqual(r.get("type"), "b-m-r")      # reitit navigoitavina reitteinä
+        named = [l.get("callsign") for l in r.findall("detail/link") if l.get("type") == "b-m-p-w"]
+        self.assertIn("Kolmoislammen laavu", named)   # taukopaikka (OSM) reitin varrella reittipisteenä
+        self.assertTrue(named[0].endswith("alku") and named[-1].endswith("loppu"))
         self.assertNotIn("lipas-900008", uids)       # Testilaavu suodatettu
         self.assertIn("osm-n1002", uids)             # OSM-käymälä retkikohteen lähellä
         self.assertNotIn("osm-n1001", uids)          # duplikaatti LOI-käymälän kanssa

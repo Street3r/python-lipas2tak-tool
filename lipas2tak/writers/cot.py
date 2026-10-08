@@ -79,8 +79,12 @@ def polyline(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
 def route(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
           start_name: str, end_name: str, stroke_weight: float = 3.0,
           method: str = "Walking", route_kind: str = "On Foot",
-          now: datetime | None = None, stale_days: int = 365) -> str:
+          now: datetime | None = None, stale_days: int = 365,
+          waypoints: dict[int, tuple[str, str]] | None = None) -> str:
     """Navigoitava ATAK-reitti (b-m-r).
+
+    `waypoints`: {solmuindeksi: (nimi, kuvaus)} – reitin varren taukopaikat
+    nimettyinä reittipisteinä (b-m-p-w), joihin ATAKin navigointi viittaa.
 
     Rakenne on kopioitu ATAK 5.8:n omasta viennistä (Iivaara-esimerkki):
     reitin oma piste on 0,0; reittipisteet ovat <link>-elementtejä, joista
@@ -98,10 +102,13 @@ def route(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
             typ, cs = "b-m-p-w", start_name
         elif i == last:
             typ, cs = "b-m-p-w", end_name
+        elif waypoints and i in waypoints:
+            typ, cs = "b-m-p-w", waypoints[i][0]
         else:
             typ, cs = "b-m-p-c", ""
+        rem = waypoints[i][1] if waypoints and i in waypoints else ""
         links.append(f"<link uid={quoteattr(f'{uid}-p{i}')} callsign={quoteattr(cs)} type='{typ}' "
-                     f"point='{_fmt(lat)},{_fmt(lon)}' remarks='' relation='c'/>")
+                     f"point='{_fmt(lat)},{_fmt(lon)}' remarks={quoteattr(rem)} relation='c'/>")
     return (
         "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>"
         f"<event version='2.0' uid={quoteattr(uid)} type='b-m-r' {_times(now, stale_days)} "

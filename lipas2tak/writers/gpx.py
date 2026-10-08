@@ -15,15 +15,21 @@ HEADER = ('<?xml version="1.0" encoding="UTF-8"?>\n'
           'xmlns="http://www.topografix.com/GPX/1/1">\n')
 
 
-def route_gpx(name: str, desc: str, lines: list[Line], link: str = "") -> str:
+def route_gpx(name: str, desc: str, lines: list, link: str = "") -> str:
+    """`lines`: [Line] tai [(Line, {solmuindeksi: nimi})] – nimetyt pisteet saavat <name>."""
     parts = [HEADER, f"<metadata><name>{escape(name)}</name>"]
     if link:
         parts.append(f'<link href="{escape(link)}"/>')
     parts.append("</metadata>\n")
-    for i, line in enumerate(lines, 1):
+    for i, item in enumerate(lines, 1):
+        line, names = item if isinstance(item, tuple) else (item, {})
         rname = name if len(lines) == 1 else f"{name} ({i}/{len(lines)})"
         parts.append(f"<rte><name>{escape(rname)}</name><desc>{escape(desc)}</desc>\n")
-        parts.extend(f'<rtept lat="{lat:.6f}" lon="{lon:.6f}"/>\n' for lon, lat in line)
+        for j, (lon, lat) in enumerate(line):
+            if j in names:
+                parts.append(f'<rtept lat="{lat:.6f}" lon="{lon:.6f}"><name>{escape(names[j])}</name></rtept>\n')
+            else:
+                parts.append(f'<rtept lat="{lat:.6f}" lon="{lon:.6f}"/>\n')
         parts.append("</rte>\n")
     parts.append("</gpx>\n")
     return "".join(parts)

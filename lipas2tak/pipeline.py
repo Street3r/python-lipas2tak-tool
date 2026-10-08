@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import areas as areas_mod
-from . import normalize, remarks
+from . import normalize, remarks, waypoints
 from .config import Settings, file_slug
 from .model import AreaDef, Feature
 from .sources import lipas, osm, regions
@@ -114,6 +114,12 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
         feats.extend(kept)
 
     log.info("Kohteita normalisoinnin jälkeen: %d", len(feats))
+    wp = settings.get("routes", "waypoints") or {}
+    if wp.get("enabled", True):
+        waypoints.attach_waypoints(
+            feats, {k.key: k.group for k in settings.kinds.values()},
+            groups=wp.get("groups", ["suojat", "tulentekopaikat", "telttailu", "nakotornit"]),
+            radius_m=wp.get("radius_m", 75), cluster_m=wp.get("cluster_m", 200))
     all_areas: dict[str, AreaDef] = {}
     for cat, sites in raw.area_sites.items():
         defs = areas_mod.areas_from_lipas_sites(sites, cat, settings.get("areas", cat),
@@ -180,7 +186,11 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                     if route_format == "shape":
                         xml = cot.polyline(uid, line, name, rem, k.color or "#FF0000", stroke, now=now)
                     else:
-                        xml = cot.route(uid, line, name, rem, k.color or "#FF0000",
+                        wps = {i: (remarks.display_name(ws[0], kinds[ws[0].kind], lang),
+                                   ", ".join(dict.fromkeys(kinds[w.kind].label.get(lang) or kinds[w.kind].label["fi"]
+                                                           for w in ws)))
+                               for i, ws in f.waypoints}
+                        xml = cot.route(uid, line, name, rem, k.color or "#FF0000", waypoints=wps,
                                         start_name=f"{name} – {ENDPOINTS['start'][lang]}",
                                         end_name=f"{name} – {ENDPOINTS['end'][lang]}",
                                         stroke_weight=stroke, method=k.route_method,
@@ -191,7 +201,8 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                 folder.placemarks.append(kml.Placemark(f.uid, name, rem, f"s-{k.key}", lines=f.lines))
                 gkey = f.group_uid or f.uid
                 g = gpx_groups.setdefault(gkey, (name, rem, f.www, []))
-                g[3].extend(f.lines)
+                g[3].append((f.lines[0], {i: remarks.display_name(ws[0], kinds[ws[0].kind], lang)
+                                          for i, ws in f.waypoints}))
             else:
                 assert f.point
                 path = iconset.iconsetpath(k.icon) if k.icon else None

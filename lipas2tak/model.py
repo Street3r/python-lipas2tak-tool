@@ -49,6 +49,9 @@ class Feature:
     city_code: Optional[int] = None
     updated: str = ""
     group_uid: str = ""        # monipalaisen reitin yhteinen tunniste (GPX-kokoamiseen)
+    # Reitin varren kohderyppäät nimettyinä reittipisteinä: [(solmuindeksi, [Feature, ...])]
+    # (ensimmäinen Feature = ryppään edustaja, jonka nimi näytetään)
+    waypoints: list = field(default_factory=list)
     # Täytetään rikastusvaiheessa
     areas: list[str] = field(default_factory=list)    # alueavaimet, esim. kansallispuistot/nuuksio
     region: Optional[str] = None                      # maakunta-avain, esim. maakunnat/uusimaa

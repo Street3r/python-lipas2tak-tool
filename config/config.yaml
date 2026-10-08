@@ -74,6 +74,12 @@ routes:
   # vähintään tämä osuus sen pituudesta tai vähintään area_min_inside_m metriä.
   area_min_share: 0.3
   area_min_inside_m: 3000
+  # Reitin varren taukopaikat nimettyinä reittipisteinä (ATAK-navigointi, GPX)
+  waypoints:
+    enabled: true
+    radius_m: 75              # kohde enintään näin kaukana reittiviivasta
+    cluster_m: 200            # tätä lähempänä toisiaan olevat kohteet = yksi reittipiste
+    groups: [suojat, tulentekopaikat, telttailu, nakotornit]
 
 remarks:
   max_text_chars: 500         # ennen hashtageja

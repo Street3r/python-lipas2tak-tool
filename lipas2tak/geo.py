@@ -147,6 +147,26 @@ def merge_lines(lines: Iterable[Line], snap_m: float = 5.0) -> list[Line]:
     return out
 
 
+def snap_to_line(line: Line, pt: Coord, max_dist_m: float):
+    """Lähin kohta viivalla: (segmentin indeksi, t 0..1, piste viivalla, etäisyys m) tai None."""
+    proj = LocalProjection(pt[1])
+    p = proj.fwd(pt)
+    best = None
+    prev = proj.fwd(line[0])
+    for i in range(len(line) - 1):
+        cur = proj.fwd(line[i + 1])
+        dx, dy = cur[0] - prev[0], cur[1] - prev[1]
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - prev[0]) * dx + (p[1] - prev[1]) * dy) / L2))
+        qx, qy = prev[0] + t * dx, prev[1] + t * dy
+        d = math.hypot(p[0] - qx, p[1] - qy)
+        if d <= max_dist_m and (best is None or d < best[3]):
+            a, b = line[i], line[i + 1]
+            best = (i, t, (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])), d)
+        prev = cur
+    return best
+
+
 class GridIndex:
     """Yksinkertainen ruudukkoindeksi lähipistehakuun.
 

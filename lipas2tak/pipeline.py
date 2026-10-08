@@ -106,6 +106,10 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
         src = clf.osm_source(kind)
         cand = [f for f in (normalize.osm_to_feature(e, kind) for e in els) if f]
         cand = [f for f in cand if not clf.excluded(f.name.fi)]
+        # An OSM element can match several kinds (e.g. a picnic shelter that is also
+        # tagged as a fire pit): keep it only once, under the first kind (types.yaml order)
+        seen = {f.uid for f in feats}
+        cand = [f for f in cand if f.uid not in seen]
         kept = normalize.dedupe_osm(
             cand, feats,
             context_radius_m=src.get("context_radius_m", oc.get("context_radius_m", 300)),

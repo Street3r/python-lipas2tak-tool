@@ -205,6 +205,18 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("links%2Fall_fi.kml", start)
         self.assertIn("../en/index.html", start)       # language switch
 
+    def test_osm_element_in_two_kinds_kept_once(self):
+        # Kolmoislammen laavu (kept as laavu) also tagged as a fire pit
+        el = next(e for e in self.raw.osm["laavu"] if e["id"] == 3002)
+        self.raw.osm["nuotiopaikka"] = [dict(el)]
+        self.run_once()
+        out = self.tmp / "out"
+        idx = json.loads((out / "index.json").read_text())
+        for e in idx["areas"]:
+            with zipfile.ZipFile(out / e["files"]["datapackage"]) as z:
+                names = z.namelist()
+            self.assertEqual(len(names), len(set(names)), e["key"])
+
     def test_output_is_deterministic(self):
         """A second run with unchanged data produces byte-identical files
         (apart from the index files that carry the run time)."""

@@ -68,6 +68,6 @@ Tiedostot kirjoitetaan ensin väliaikaiseen hakemistoon ja vaihdetaan paikalleen
 
 Ks. [docs/suunnitelma.md](docs/suunnitelma.md).
 
-- Kuvakkeet ovat väliaikaisia. Metsähallitukselta on pyydetty lupaa käyttää heidän symbolejaan.
+- Kuvakkeet (`icons/retkeily`, piirretty `scripts/make_icons.py`:llä) ovat omia kuvasymboleja retkeilykarttojen tyyliin, eivät Metsähallituksen symboleja. Metsähallitukselta on pyydetty lupaa heidän symboliensa käyttöön; vaihto = uudet PNG:t samoilla nimillä.
 - Metsähallituksen ylläpitämiä kohteita ja reittejä puuttuu Lipaksesta paikoin, esim. Nuuksiosta.
 - ATAKissa testattavat: iconsetin polkurakenne, `u-d-f`-linkkipisteet ilman korkeutta, hashtag-haku pitkässä remarksissa, GPX `<rte>` → reitti.

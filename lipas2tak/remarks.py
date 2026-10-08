@@ -10,6 +10,8 @@ SERVICE_LABELS = {
     "water": {"fi": "vesipiste", "en": "water"},
     "rest_places": {"fi": "taukopaikkoja", "en": "rest stops"},
     "wheelchair": {"fi": "esteetön", "en": "wheelchair accessible"},
+    "fireplace": {"fi": "tulipaikka", "en": "fire place"},
+    "viewpoint": {"fi": "näköala", "en": "viewpoint"},
 }
 
 ADMIN_LABELS = {

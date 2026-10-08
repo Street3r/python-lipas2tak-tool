@@ -259,6 +259,40 @@ def osm_to_feature(el: dict, kind_key: str) -> Optional[Feature]:
     )
 
 
+# When one OSM element matches several kinds (e.g. a lean-to also tagged as a fire
+# pit), the kind earlier in this list wins; kinds not listed lose to listed ones.
+OSM_MERGE_PRIORITY = ["tupa", "kota", "laavu", "keittokatos", "nakotorni", "telttapaikka",
+                      "nuotiopaikka", "nakoalapaikka", "kaymala", "vesipiste"]
+# The losing kind is added to the winner's services ...
+OSM_MERGE_SERVICE = {"nuotiopaikka": "fireplace", "nakoalapaikka": "viewpoint",
+                     "kaymala": "toilet", "vesipiste": "water"}
+# ... unless the winner already implies it
+OSM_MERGE_IMPLIED = {("keittokatos", "nuotiopaikka"), ("nakotorni", "nakoalapaikka")}
+
+
+def merge_osm_kinds(candidates: dict[str, list[Feature]],
+                    priority: list[str] = OSM_MERGE_PRIORITY) -> dict[str, list[Feature]]:
+    """Resolve OSM elements that matched several kinds: one feature per element.
+
+    candidates: {kind: [Feature]} -> {kind: [Feature]} with each UID only once.
+    """
+    rank = {k: i for i, k in enumerate(priority)}
+    by_uid: dict[str, list[Feature]] = {}
+    for kind, feats in candidates.items():
+        for f in feats:
+            by_uid.setdefault(f.uid, []).append(f)
+    out: dict[str, list[Feature]] = {k: [] for k in candidates}
+    for uid, fs in by_uid.items():
+        fs.sort(key=lambda f: rank.get(f.kind, len(rank)))
+        win = fs[0]
+        for lose in fs[1:]:
+            svc = OSM_MERGE_SERVICE.get(lose.kind)
+            if svc and (win.kind, lose.kind) not in OSM_MERGE_IMPLIED and svc not in win.services:
+                win.services.append(svc)
+        out[win.kind].append(win)
+    return out
+
+
 def dedupe_osm(features: Iterable[Feature], context: list[Feature], *, context_radius_m: float,
                dedupe_radius_m: float, group_of=None) -> list[Feature]:
     """Keep OSM features that are near outdoor features and are not duplicates.

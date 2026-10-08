@@ -100,16 +100,17 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
 
     oc = settings.get("sources", "osm") or {}
     enabled = {k.key for k in settings.enabled_kinds()}
+    candidates = {}
     for kind, els in raw.osm.items():
         if kind not in enabled:
             continue
-        src = clf.osm_source(kind)
         cand = [f for f in (normalize.osm_to_feature(e, kind) for e in els) if f]
-        cand = [f for f in cand if not clf.excluded(f.name.fi)]
-        # An OSM element can match several kinds (e.g. a picnic shelter that is also
-        # tagged as a fire pit): keep it only once, under the first kind (types.yaml order)
-        seen = {f.uid for f in feats}
-        cand = [f for f in cand if f.uid not in seen]
+        candidates[kind] = [f for f in cand if not clf.excluded(f.name.fi)]
+    # An OSM element can match several kinds (e.g. a lean-to also tagged as a fire pit):
+    # keep one feature under the main kind and add the other as a service
+    candidates = normalize.merge_osm_kinds(candidates)
+    for kind, cand in candidates.items():
+        src = clf.osm_source(kind)
         kept = normalize.dedupe_osm(
             cand, feats,
             context_radius_m=src.get("context_radius_m", oc.get("context_radius_m", 300)),

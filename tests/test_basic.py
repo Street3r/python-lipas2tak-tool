@@ -216,6 +216,34 @@ class PipelineTests(unittest.TestCase):
             with zipfile.ZipFile(out / e["files"]["datapackage"]) as z:
                 names = z.namelist()
             self.assertEqual(len(names), len(set(names)), e["key"])
+        park = next(e for e in idx["areas"] if e["key"] == "kansallispuistot/nuuksio" and e["lang"] == "fi")
+        with zipfile.ZipFile(out / park["files"]["datapackage"]) as z:
+            ev = ET.fromstring(z.read("osm-n3002/osm-n3002.cot"))
+        self.assertTrue(ev.find("detail/usericon").get("iconsetpath").endswith("/laavu.png"))
+        self.assertIn("tulipaikka", ev.find("detail/remarks").text)
+
+    def test_merge_osm_kinds_rules(self):
+        from lipas2tak.model import Feature, Localized
+        from lipas2tak.normalize import merge_osm_kinds
+
+        def f(kind):
+            return Feature(uid="osm-n1", source="osm", source_id="node/1", kind=kind, name=Localized(),
+                           point=(25.0, 60.0))
+        cases = [
+            (("nakoalapaikka", "nakotorni"), "nakotorni", []),
+            (("nuotiopaikka", "laavu"), "laavu", ["fireplace"]),
+            (("kota", "tupa"), "tupa", []),
+            (("nuotiopaikka", "keittokatos"), "keittokatos", []),
+            (("nuotiopaikka", "kota"), "kota", ["fireplace"]),
+            (("nuotiopaikka", "telttapaikka"), "telttapaikka", ["fireplace"]),
+            (("nakoalapaikka", "nuotiopaikka"), "nuotiopaikka", ["viewpoint"]),
+            (("nakoalapaikka", "laavu"), "laavu", ["viewpoint"]),
+            (("kaymala", "telttapaikka"), "telttapaikka", ["toilet"]),
+        ]
+        for kinds, winner, services in cases:
+            res = merge_osm_kinds({k: [f(k)] for k in kinds})
+            got = [(k, x.services) for k, xs in res.items() for x in xs]
+            self.assertEqual(got, [(winner, services)], kinds)
 
     def test_output_is_deterministic(self):
         """A second run with unchanged data produces byte-identical files

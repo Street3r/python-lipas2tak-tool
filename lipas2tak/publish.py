@@ -135,6 +135,10 @@ def _sync_tree(src: Path, repo: Path) -> None:
 
 def _changelog(old: str, now: datetime, changes: dict, n_features: int) -> str:
     lines = [f"## {now.strftime('%Y-%m-%d')}", "", f"{n_features} features."]
+    if not old.strip():
+        lines.append("- first publication")
+        changes = {}
+        return "# Changelog\n\nLatest updates of the generated data.\n\n" + "\n".join(lines) + "\n"
     for key, v in sorted(changes.items()):
         if key.endswith("/en"):
             continue  # same changes as /fi

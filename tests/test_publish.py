@@ -69,6 +69,7 @@ class PublishTests(unittest.TestCase):
         log = git(self.remote, "show", "data:CHANGELOG.md")
         self.assertIn("## 2026-10-22", log)
         self.assertIn("## 2026-10-08", log)
+        self.assertIn("first publication", log)
         self.assertIn("kansallispuistot/nuuksio: +0 new, -0 removed, ~1 changed", log)
 
 

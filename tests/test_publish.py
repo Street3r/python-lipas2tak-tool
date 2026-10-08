@@ -72,5 +72,30 @@ class PublishTests(unittest.TestCase):
         self.assertIn("kansallispuistot/nuuksio: +0 new, -0 removed, ~1 changed", log)
 
 
+class BatchUploadTests(PublishTests):
+    def test_publish_cycle(self):  # replaced by the test below
+        pass
+
+    def test_failed_push_falls_back_to_batches(self):
+        orig, state = publish._git, {"failed": False}
+
+        def flaky(repo, *args, **kw):
+            if args[:1] == ("push",) and args[-1].endswith("refs/heads/data") and not state["failed"]:
+                state["failed"] = True
+                raise subprocess.CalledProcessError(128, "git push")
+            return orig(repo, *args, **kw)
+
+        publish._git, publish.BATCH_BYTES = flaky, 200_000
+        try:
+            res = publish.publish(self.settings, now=datetime(2026, 10, 8, tzinfo=timezone.utc), **self.kw)
+        finally:
+            publish._git, publish.BATCH_BYTES = orig, 40 * 1024 * 1024
+        self.assertTrue(res.startswith("published"))
+        self.assertTrue(state["failed"])
+        self.assertEqual(git(self.remote, "branch", "--format=%(refname:short)"), "data")   # upload branch removed
+        self.assertEqual(git(self.remote, "rev-list", "--count", "data"), "1")
+        self.assertIn("links/all_fi.kml", git(self.remote, "ls-tree", "-r", "--name-only", "data"))
+
+
 if __name__ == "__main__":
     unittest.main()

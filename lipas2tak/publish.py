@@ -64,6 +64,45 @@ def _git(repo: Path, *args: str, check: bool = True, capture: bool = False, env:
     return (res.stdout or "").strip() if capture else ""
 
 
+UPLOAD_BRANCH = "data-upload"
+BATCH_BYTES = 40 * 1024 * 1024
+
+
+def _push_in_batches(repo: Path, ident: dict, batch_bytes: Optional[int] = None) -> None:
+    """Upload the working tree in batches to a temporary branch.
+
+    A first publish can be hundreds of MB, and one large push may be cut off.
+    Each batch is a commit adding ~40 MB on a temporary branch; afterwards the
+    final single-commit push only has to send the (small) tree objects, since
+    the remote already has every file. The temporary branch is deleted later.
+    """
+    batch_bytes = batch_bytes or BATCH_BYTES
+    files = [p for p in repo.rglob("*") if p.is_file() and ".git" not in p.relative_to(repo).parts]
+    batches, cur, size = [], [], 0
+    for p in sorted(files):
+        if cur and size + p.stat().st_size > batch_bytes:
+            batches.append(cur)
+            cur, size = [], 0
+        cur.append(p)
+        size += p.stat().st_size
+    if cur:
+        batches.append(cur)
+    index = repo / ".git" / "upload-index"
+    index.unlink(missing_ok=True)
+    env = {**ident, "GIT_INDEX_FILE": str(index)}
+    parent = None
+    for i, batch in enumerate(batches, 1):
+        rels = [str(p.relative_to(repo)) for p in batch]
+        for j in range(0, len(rels), 200):
+            _git(repo, "update-index", "--add", "--", *rels[j:j + 200], env=env)
+        tree = _git(repo, "write-tree", capture=True, env=env)
+        args = ["commit-tree", tree, "-m", f"upload batch {i}/{len(batches)}"] + (["-p", parent] if parent else [])
+        parent = _git(repo, *args, capture=True, env=env)
+        log.info("Uploading batch %d/%d (%d files)", i, len(batches), len(batch))
+        _git(repo, "push", "-q", "--force", "origin", f"{parent}:refs/heads/{UPLOAD_BRANCH}")
+    index.unlink(missing_ok=True)
+
+
 def _prepare_repo(repo: Path, url: str, branch: str) -> None:
     if not (repo / ".git").exists():
         repo.mkdir(parents=True, exist_ok=True)
@@ -167,7 +206,13 @@ def publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, bra
     ident["GIT_COMMITTER_NAME"], ident["GIT_COMMITTER_EMAIL"] = ident["GIT_AUTHOR_NAME"], ident["GIT_AUTHOR_EMAIL"]
     tree = _git(repo, "write-tree", capture=True)
     commit = _git(repo, "commit-tree", tree, "-m", msg, capture=True, env=ident)
-    _git(repo, "push", "-q", "--force", "origin", f"{commit}:refs/heads/{branch}")
+    try:
+        _git(repo, "push", "-q", "--force", "origin", f"{commit}:refs/heads/{branch}")
+    except subprocess.CalledProcessError:
+        log.warning("Push failed; uploading in batches and retrying")
+        _push_in_batches(repo, ident)
+        _git(repo, "push", "-q", "--force", "origin", f"{commit}:refs/heads/{branch}")
+        _git(repo, "push", "-q", "origin", f":refs/heads/{UPLOAD_BRANCH}", check=False)
     _git(repo, "reset", "-q", "--hard", commit)
     log.info("Published %s to %s: %s", commit[:8], branch, msg)
     return f"published: {len(real)} files" if real else "checked: no changes"

@@ -65,9 +65,12 @@ def fetch_raw(settings: Settings, clf: normalize.Classifier) -> RawData:
     if oc.get("enabled"):
         for kind, tags in clf.osm_queries():
             try:
-                raw.osm[kind] = osm.fetch(client, oc["overpass_url"], tags)
+                els = osm.fetch(client, oc["overpass_url"], tags)
             except Exception as e:  # OSM on täydentävä lähde: virhe ei kaada ajoa
-                log.error("OSM-haku epäonnistui (%s): %s", kind, e)
+                log.error("OSM-haku epäonnistui (%s %s): %s", kind, tags, e)
+                continue
+            seen = {(e["type"], e["id"]) for e in raw.osm.get(kind, [])}
+            raw.osm.setdefault(kind, []).extend(e for e in els if (e["type"], e["id"]) not in seen)
     if (settings.get("areas", "maakunnat") or {}).get("enabled"):
         rc = settings.get("sources", "regions")
         data = client.get_json(rc["wfs_url"], params={
@@ -95,10 +98,18 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
     feats = list({f.uid: f for f in feats}.values())
 
     oc = settings.get("sources", "osm") or {}
+    enabled = {k.key for k in settings.enabled_kinds()}
     for kind, els in raw.osm.items():
+        if kind not in enabled:
+            continue
+        src = clf.osm_source(kind)
         cand = [f for f in (normalize.osm_to_feature(e, kind) for e in els) if f]
-        kept = normalize.dedupe_osm(cand, feats, context_radius_m=oc.get("context_radius_m", 300),
-                                    dedupe_radius_m=oc.get("dedupe_radius_m", 40))
+        cand = [f for f in cand if not clf.excluded(f.name.fi)]
+        kept = normalize.dedupe_osm(
+            cand, feats,
+            context_radius_m=src.get("context_radius_m", oc.get("context_radius_m", 300)),
+            dedupe_radius_m=src.get("dedupe_radius_m", oc.get("dedupe_radius_m", 40)),
+            group_of=clf.group_of)
         log.info("OSM %s: %d/%d otettu mukaan", kind, len(kept), len(cand))
         feats.extend(kept)
 
@@ -124,6 +135,9 @@ def _digest(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
+ENDPOINTS = {"start": {"fi": "alku", "en": "start"}, "end": {"fi": "loppu", "en": "end"}}
+
+
 def _route_parts(f: Feature) -> list[tuple[str, list]]:
     if len(f.lines) == 1:
         return [(f.uid, f.lines[0])]
@@ -134,9 +148,10 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                out_root: Path, now: datetime) -> list[dict]:
     """Kirjoittaa yhden alueen tuotokset kaikilla kielillä. Palauttaa index-merkinnät."""
     kinds = settings.kinds
-    icons_dir = settings.path("icons")
+    icons_dir = settings.icon_dirs()
     outs = settings.get("outputs") or {}
     stroke = float(settings.get("routes", "stroke_weight", default=4.0))
+    route_format = settings.get("routes", "cot_format", default="route")
     base_url = (settings.get("public_base_url") or "").rstrip("/")
     entries = []
     feats = sorted(feats, key=lambda f: (kinds[f.kind].group, f.kind, f.name.fi, f.uid))
@@ -162,7 +177,14 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
             if f.is_route:
                 parts = _route_parts(f)
                 for uid, line in parts:
-                    xml = cot.polyline(uid, line, name, rem, k.color or "#FF0000", stroke, now=now)
+                    if route_format == "shape":
+                        xml = cot.polyline(uid, line, name, rem, k.color or "#FF0000", stroke, now=now)
+                    else:
+                        xml = cot.route(uid, line, name, rem, k.color or "#FF0000",
+                                        start_name=f"{name} – {ENDPOINTS['start'][lang]}",
+                                        end_name=f"{name} – {ENDPOINTS['end'][lang]}",
+                                        stroke_weight=stroke, method=k.route_method,
+                                        route_kind=k.route_type, now=now)
                     cot_items.append((uid, name, xml))
                     uid_digests[uid] = _digest(name + rem + repr(line))
                 line_styles[f"s-{k.key}"] = (k.color or "#FF0000", stroke)
@@ -236,7 +258,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     staging.mkdir(parents=True)
 
     used_icons = [k.icon for k in settings.enabled_kinds() if k.icon]
-    iconset.write(staging / "iconset" / "lipas2tak_iconset.zip", settings.path("icons"), used_icons)
+    iconset.write(staging / "iconset" / "lipas2tak_iconset.zip", settings.icon_dirs(), used_icons)
 
     index_areas = []
     targets = [a for a in all_areas.values() if not only or a.key in only or a.slug in only]

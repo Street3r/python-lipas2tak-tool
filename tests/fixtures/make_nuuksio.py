@@ -93,7 +93,11 @@ lois = [
      "geometries": pt(24.5100, 60.3100)},
 ]
 
-osm = {"kaymala": [
+osm = {"laavu": [
+    {"type": "node", "id": 3001, "lat": 60.30850, "lon": 24.50600, "tags": {"amenity": "shelter", "shelter_type": "lean_to", "name": "Haukkalammen laavu"}},  # Lipaksessa jo
+    {"type": "node", "id": 3002, "lat": 60.3135, "lon": 24.4935, "tags": {"amenity": "shelter", "shelter_type": "lean_to", "name": "Kolmoislammen laavu"}},  # uusi, reitin varrella
+    {"type": "node", "id": 3003, "lat": 60.5000, "lon": 25.5000, "tags": {"amenity": "shelter", "shelter_type": "lean_to"}},  # kaukana kaikesta
+], "kaymala": [
     {"type": "node", "id": 1001, "lat": 60.30852, "lon": 24.50555, "tags": {"amenity": "toilets"}},  # duplikaatti
     {"type": "node", "id": 1002, "lat": 60.3172, "lon": 24.4870, "tags": {"amenity": "toilets", "name": "Mustalammen huussi"}},
     {"type": "way", "id": 2001, "center": {"lat": 60.1699, "lon": 24.9384}, "tags": {"amenity": "toilets"}},  # Helsinki

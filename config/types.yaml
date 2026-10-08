@@ -37,6 +37,8 @@ kinds:
     cot_type: a-u-G
     sources:
       lipas: {type_codes: [301], name_regex: "kota|kåta"}
+      # OSM-täydennys: otetaan vain, jos Lipaksessa ei ole lähellä samaan ryhmään kuuluvaa kohdetta
+      osm: {tags: {amenity: shelter, shelter_type: basic_hut}, context_radius_m: 1500, dedupe_radius_m: 120}
   kammi:
     label: {fi: Kammi, en: Turf hut}
     tag: {fi: kammi, en: turfhut}
@@ -53,6 +55,7 @@ kinds:
     cot_type: a-u-G
     sources:
       lipas: {type_codes: [301]}
+      osm: {tags: {amenity: shelter, shelter_type: lean_to}, context_radius_m: 1500, dedupe_radius_m: 120}
   tupa:
     label: {fi: Tupa, en: Hut}
     tag: {fi: tupa, en: hut}
@@ -61,6 +64,7 @@ kinds:
     cot_type: a-u-G
     sources:
       lipas: {type_codes: [302]}
+      osm: {tags: {tourism: wilderness_hut}, context_radius_m: 3000, dedupe_radius_m: 150}
 
   # --- Tulentekopaikat ------------------------------------------------------
   keittokatos:
@@ -72,6 +76,7 @@ kinds:
     sources:
       lipas: {type_codes: [206], name_regex: "keittokatos|katos"}
       loi: {types: [cooking-shelter]}
+      osm: {tags: {amenity: shelter, shelter_type: picnic_shelter}, context_radius_m: 1500, dedupe_radius_m: 80}
   nuotiopaikka:
     label: {fi: Nuotiopaikka, en: Campfire site}
     tag: {fi: nuotiopaikka, en: campfire}
@@ -81,6 +86,7 @@ kinds:
     sources:
       lipas: {type_codes: [206]}
       loi: {types: [fire-pit]}
+      osm: {tags: {leisure: firepit}, context_radius_m: 1500, dedupe_radius_m: 60}
 
   # --- Näkötornit ---------------------------------------------------------
   nakotorni:
@@ -92,6 +98,7 @@ kinds:
     sources:
       lipas: {type_codes: [204]}
       loi: {types: [viewing-platform]}
+      osm: {tags: {man_made: tower, "tower:type": observation}, context_radius_m: 3000, dedupe_radius_m: 120}
   nakoalapaikka:
     label: {fi: Näköalapaikka, en: Viewpoint}
     tag: {fi: nakoalapaikka, en: viewpoint}
@@ -100,6 +107,7 @@ kinds:
     cot_type: a-u-G
     sources:
       loi: {types: [viewpoint]}
+      osm: {tags: {tourism: viewpoint}, context_radius_m: 1000, dedupe_radius_m: 80}
 
   # --- Telttailu ----------------------------------------------------------
   telttapaikka:
@@ -111,6 +119,12 @@ kinds:
     sources:
       lipas: {type_codes: [202]}
       loi: {types: [tent-site, reservation-campsite]}
+      osm:
+        tags:
+          - {tourism: camp_site, backcountry: "yes"}
+          - {tourism: camp_site, camp_site: basic}
+        context_radius_m: 2000
+        dedupe_radius_m: 120
 
   # --- Käymälät -----------------------------------------------------------
   kaymala:
@@ -159,6 +173,12 @@ kinds:
     cot_type: a-u-G
     sources:
       loi: {types: [well, water-source]}
+      osm:
+        tags:
+          - {man_made: water_well}
+          - {amenity: drinking_water}
+        context_radius_m: 500
+        dedupe_radius_m: 50
   rantautumispaikka:
     label: {fi: Rantautumispaikka, en: Landing spot}
     tag: {fi: rantautuminen, en: landing}

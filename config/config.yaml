@@ -10,7 +10,11 @@ public_base_url: "https://example.org/lipas2tak"   # env: LIPAS2TAK_PUBLIC_BASE_
 paths:
   cache: data/cache        # raakadata ja välimuisti
   output: data/output      # julkaistavat tiedostot (nginx tarjoilee tämän)
-  icons: icons/retkeily    # oma kuvasymbolisarja (scripts/make_icons.py); vaihdettavissa MH-symboleihin luvan jälkeen
+  # Kuvakesarja. Oletus on oma kuvasymbolisarja. Pilotissa voi käyttää omia
+  # kuvakkeita (esim. Luontoon.fi) asettamalla LIPAS2TAK_ICONS_DIR; puuttuvat
+  # kuvakkeet haetaan icons_fallback-kansiosta. Ks. icons/README.md.
+  icons: icons/retkeily              # env: LIPAS2TAK_ICONS_DIR
+  icons_fallback: icons/retkeily
 
 sources:
   lipas:
@@ -61,6 +65,8 @@ areas:
     enabled: true
 
 routes:
+  # CoT-muoto: route = navigoitava ATAK-reitti (b-m-r), shape = piirretty viiva (u-d-f)
+  cot_format: route
   simplify_tolerance_m: 5.0   # Douglas–Peucker
   merge_snap_m: 5.0           # palojen yhdistäminen
   stroke_weight: 4.0

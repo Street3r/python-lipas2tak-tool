@@ -23,7 +23,7 @@ def iconsetpath(icon: str) -> str:
     return f"{ICONSET_UID}/{ICONSET_GROUP}/{icon}"
 
 
-def write(path: Path, icons_dir: Path, icons: list[str], cot_type: str = "a-u-G") -> None:
+def write(path: Path, icons_dir, icons: list[str], cot_type: str = "a-u-G") -> None:
     entries = "\n".join(f"  <icon name={quoteattr(i)} type2525b={quoteattr(cot_type)}/>" for i in sorted(set(icons)))
     xml = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
@@ -36,7 +36,15 @@ def write(path: Path, icons_dir: Path, icons: list[str], cot_type: str = "a-u-G"
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("iconset.xml", xml)
         for i in sorted(set(icons)):
-            src = icons_dir / i
+            src = _find(icons_dir, i)
             if src.exists():
                 z.write(src, f"{ICONSET_GROUP}/{i}")
     tmp.replace(path)
+
+
+def _find(dirs, name: str) -> Path:
+    """Ensimmäinen kansio, josta kuvake löytyy (Path tai lista Patheja)."""
+    for d in (dirs if isinstance(dirs, (list, tuple)) else [dirs]):
+        if (Path(d) / name).exists():
+            return Path(d) / name
+    return Path(dirs[0] if isinstance(dirs, (list, tuple)) else dirs) / name

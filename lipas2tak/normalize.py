@@ -33,7 +33,28 @@ class Classifier:
         return sorted(types)
 
     def osm_queries(self) -> list[tuple[str, dict]]:
-        return [(k.key, k.sources["osm"]["tags"]) for k in self.kinds if k.sources.get("osm")]
+        """[(kind, tagit)] – `tags` voi olla yksi dict tai lista vaihtoehtoisia dictejä."""
+        out = []
+        for k in self.kinds:
+            src = k.sources.get("osm")
+            if not src:
+                continue
+            tags = src["tags"]
+            for t in (tags if isinstance(tags, list) else [tags]):
+                out.append((k.key, t))
+        return out
+
+    def osm_source(self, kind: str) -> dict:
+        for k in self.kinds:
+            if k.key == kind:
+                return k.sources.get("osm") or {}
+        return {}
+
+    def group_of(self, kind: str) -> str:
+        for k in self.kinds:
+            if k.key == kind:
+                return k.group
+        return ""
 
     def excluded(self, name: str) -> bool:
         return bool(name and self.exclude.search(name))
@@ -238,25 +259,33 @@ def osm_to_feature(el: dict, kind_key: str) -> Optional[Feature]:
 
 
 def dedupe_osm(features: Iterable[Feature], context: list[Feature], *, context_radius_m: float,
-               dedupe_radius_m: float, same_kind_only: bool = True) -> list[Feature]:
-    """Pitää OSM-kohteet, jotka ovat retkikohteiden lähellä eivätkä ole kaksoiskappaleita."""
-    grid = geo.GridIndex(cell_deg=0.01)
+               dedupe_radius_m: float, group_of=None) -> list[Feature]:
+    """Pitää OSM-kohteet, jotka ovat retkikohteiden lähellä eivätkä ole kaksoiskappaleita.
+
+    Kaksoiskappale = samaan ryhmään kuuluva kohde (esim. suojat: laavu/kota/tupa)
+    alle `dedupe_radius_m` päässä. Lipas/LOI voittaa aina OSM:n. Myös jo
+    hyväksytyt OSM-kohteet ovat vertailussa (node + way samasta kohteesta).
+    """
+    group_of = group_of or (lambda k: k)
+    grid = geo.GridIndex.for_radius(max(context_radius_m, dedupe_radius_m))
     for f in context:
         for c in f.all_coords():
-            grid.add(c, f.kind)
+            grid.add(c, group_of(f.kind))
     out = []
     for f in features:
         p = f.point
         assert p is not None
+        g = group_of(f.kind)
         near_ctx = False
         dup = False
-        for c, kind in grid.near(p):
+        for c, cg in grid.near(p):
             d = geo.haversine(p, c)
-            if d <= dedupe_radius_m and (kind == f.kind or not same_kind_only):
+            if d <= dedupe_radius_m and cg == g:
                 dup = True
                 break
             if d <= context_radius_m:
                 near_ctx = True
         if near_ctx and not dup:
             out.append(f)
+            grid.add(p, g)
     return out

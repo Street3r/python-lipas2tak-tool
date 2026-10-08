@@ -1,4 +1,38 @@
 {
+ "laavu": [
+  {
+   "type": "node",
+   "id": 3001,
+   "lat": 60.3085,
+   "lon": 24.506,
+   "tags": {
+    "amenity": "shelter",
+    "shelter_type": "lean_to",
+    "name": "Haukkalammen laavu"
+   }
+  },
+  {
+   "type": "node",
+   "id": 3002,
+   "lat": 60.3135,
+   "lon": 24.4935,
+   "tags": {
+    "amenity": "shelter",
+    "shelter_type": "lean_to",
+    "name": "Kolmoislammen laavu"
+   }
+  },
+  {
+   "type": "node",
+   "id": 3003,
+   "lat": 60.5,
+   "lon": 25.5,
+   "tags": {
+    "amenity": "shelter",
+    "shelter_type": "lean_to"
+   }
+  }
+ ],
  "kaymala": [
   {
    "type": "node",

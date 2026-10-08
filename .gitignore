@@ -7,3 +7,7 @@ dist/
 data/
 *.tmp
 .pytest_cache/
+
+# Pilotin kuvakkeet (tekijänoikeus: Metsähallitus) eivät kuulu repoon
+icons/luontoon/*
+!icons/luontoon/.gitkeep

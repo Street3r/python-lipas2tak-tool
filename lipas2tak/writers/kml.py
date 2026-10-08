@@ -53,7 +53,7 @@ def _placemark(p: Placemark) -> str:
 
 
 def write_kmz(path: Path, name: str, folders: list[Folder], icon_styles: dict[str, str],
-              line_styles: dict[str, tuple[str, float]], icons_dir: Path) -> None:
+              line_styles: dict[str, tuple[str, float]], icons_dir) -> None:
     """icon_styles: {style_id: kuvaketiedosto}, line_styles: {style_id: (#RRGGBB, leveys)}"""
     styles = []
     used_icons = set()
@@ -76,7 +76,7 @@ def write_kmz(path: Path, name: str, folders: list[Folder], icon_styles: dict[st
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("doc.kml", doc)
         for icon in sorted(used_icons):
-            src = icons_dir / icon
+            src = _find(icons_dir, icon)
             if src.exists():
                 z.write(src, f"files/{icon}")
     tmp.replace(path)
@@ -91,3 +91,11 @@ def write_network_link(path: Path, name: str, href: str, refresh_s: int) -> None
            "</NetworkLink></kml>\n")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(doc, encoding="utf-8")
+
+
+def _find(dirs, name: str) -> Path:
+    """Ensimmäinen kansio, josta kuvake löytyy (Path tai lista Patheja)."""
+    for d in (dirs if isinstance(dirs, (list, tuple)) else [dirs]):
+        if (Path(d) / name).exists():
+            return Path(d) / name
+    return Path(dirs[0] if isinstance(dirs, (list, tuple)) else dirs) / name

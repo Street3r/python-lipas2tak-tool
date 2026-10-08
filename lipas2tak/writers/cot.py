@@ -74,3 +74,48 @@ def polyline(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
         "<archive/><labels_on value='false'/>"
         f"<color value='{argb}'/></detail></event>"
     )
+
+
+def route(uid: str, line: Line, callsign: str, remarks: str, color_hex: str,
+          start_name: str, end_name: str, stroke_weight: float = 3.0,
+          method: str = "Walking", route_kind: str = "On Foot",
+          now: datetime | None = None, stale_days: int = 365) -> str:
+    """Navigoitava ATAK-reitti (b-m-r).
+
+    Rakenne on kopioitu ATAK 5.8:n omasta viennistä (Iivaara-esimerkki):
+    reitin oma piste on 0,0; reittipisteet ovat <link>-elementtejä, joista
+    ensimmäinen ja viimeinen ovat nimettyjä reittipisteitä (b-m-p-w) ja
+    välissä tarkistuspisteitä (b-m-p-c). Navigointiohjeet ATAK laskee itse.
+    Pisteiden UID:t ovat deterministisiä (`<uid>-p<n>`), jotta päivitys
+    korvaa vanhan reitin.
+    """
+    now = now or datetime.now(timezone.utc)
+    argb = argb_int(color_hex)
+    links = []
+    last = len(line) - 1
+    for i, (lon, lat) in enumerate(line):
+        if i == 0:
+            typ, cs = "b-m-p-w", start_name
+        elif i == last:
+            typ, cs = "b-m-p-w", end_name
+        else:
+            typ, cs = "b-m-p-c", ""
+        links.append(f"<link uid={quoteattr(f'{uid}-p{i}')} callsign={quoteattr(cs)} type='{typ}' "
+                     f"point='{_fmt(lat)},{_fmt(lon)}' remarks='' relation='c'/>")
+    return (
+        "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>"
+        f"<event version='2.0' uid={quoteattr(uid)} type='b-m-r' {_times(now, stale_days)} "
+        "how='h-e' access='Undefined'>"
+        f"<point lat='0.0' lon='0.0' hae='{HAE_UNKNOWN}' ce='{HAE_UNKNOWN}' le='{HAE_UNKNOWN}'/>"
+        f"<detail>{''.join(links)}"
+        f"<link_attr planningmethod='Infil' color='{argb}' method={quoteattr(method)} prefix='CP' "
+        f"style='0' type={quoteattr(route_kind)} stroke='{int(stroke_weight)}' direction='Infil' "
+        "routetype='Primary' order='Ascending Check Points'/>"
+        "<__routeinfo><__navcues/></__routeinfo>"
+        "<labels_on value='false'/>"
+        f"<strokeColor value='{argb}'/><strokeWeight value='{stroke_weight:.1f}'/>"
+        "<strokeStyle value='solid'/>"
+        f"<contact callsign={quoteattr(callsign)}/>"
+        f"<remarks>{escape(remarks)}</remarks>"
+        f"<archive/><color value='{argb}'/></detail></event>"
+    )

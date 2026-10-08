@@ -37,6 +37,7 @@ T = {
     "accessibility": {"fi": "Esteettömyys", "en": "Accessibility"},
     "admin": {"fi": "Ylläpito", "en": "Maintained by"},
     "temp_closed": {"fi": "TILAPÄISESTI POISSA KÄYTÖSTÄ", "en": "TEMPORARILY OUT OF SERVICE"},
+    "src_osm": {"fi": "Lähde: OpenStreetMap", "en": "Source: OpenStreetMap"},
 }
 
 
@@ -88,6 +89,8 @@ def remarks(f: Feature, kind: Kind, lang: str, areas: dict[str, AreaDef], settin
         parts.append(f.description.get(lang))
     if f.admin and f.admin in ADMIN_LABELS:
         parts.append(f"{T['admin'][lang]}: {ADMIN_LABELS[f.admin][lang]}")
+    if f.source == "osm":
+        parts.append(T["src_osm"][lang])
     text = _truncate(" · ".join(parts), int(settings.get("remarks", "max_text_chars", default=500)))
     if f.www:
         text += f" · {f.www}"

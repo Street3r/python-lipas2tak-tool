@@ -49,6 +49,8 @@ class Kind:
     color: str | None
     sources: dict
     enabled: bool = True
+    route_method: str = "Walking"   # ATAK-reitin kulkutapa (link_attr method)
+    route_type: str = "On Foot"     # ATAK-reitin tyyppi (link_attr type)
 
     @property
     def is_route(self) -> bool:
@@ -84,6 +86,19 @@ class Settings:
     def languages(self) -> list[str]:
         return list(self.get("languages", default=["fi"]))
 
+    def icon_dirs(self) -> list[Path]:
+        """Kuvakekansiot etusijajärjestyksessä: valittu sarja, sitten varasarja.
+
+        Puuttuva kuvake haetaan varasarjasta, joten valitussa sarjassa voi
+        olla vain osa kuvakkeista (esim. pilotin Luontoon.fi-kuvakkeet).
+        """
+        dirs = [self.path("icons")]
+        fb = self.get("paths", "icons_fallback")
+        if fb:
+            p = Path(fb)
+            dirs.append(p if p.is_absolute() else self.root / p)
+        return dirs
+
     def enabled_kinds(self) -> list[Kind]:
         return [k for k in self.kinds.values() if k.enabled]
 
@@ -117,6 +132,8 @@ def load_settings(config_path: str | Path | None = None, types_path: str | Path 
             color=k.get("color"),
             sources=k.get("sources") or {},
             enabled=k.get("enabled", True),
+            route_method=k.get("route_method", "Walking"),
+            route_type=k.get("route_type", "On Foot"),
         )
     names_path = config_path.parent / "area_names.yaml"
     names = yaml.safe_load(names_path.read_text(encoding="utf-8")) if names_path.exists() else {}

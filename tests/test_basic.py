@@ -77,6 +77,24 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(slugify("Näkötorni"), "nakotorni")
         self.assertEqual(slugify("Pallas-Yllästunturi"), "pallasyllastunturi")
 
+    def test_route_structure_matches_atak_example(self):
+        xml = cot.route("r1", [(24.5, 60.3), (24.51, 60.31), (24.52, 60.3)], "Reitti", "rem #x",
+                        "#7F007F", "Reitti – alku", "Reitti – loppu")
+        root = ET.fromstring(xml)
+        self.assertEqual(root.get("type"), "b-m-r")
+        self.assertEqual(root.find("point").get("lat"), "0.0")
+        links = root.findall("detail/link")
+        self.assertEqual([l.get("type") for l in links], ["b-m-p-w", "b-m-p-c", "b-m-p-w"])
+        self.assertEqual(links[0].get("callsign"), "Reitti – alku")
+        self.assertEqual(links[0].get("uid"), "r1-p0")
+        self.assertEqual(links[1].get("relation"), "c")
+        la = root.find("detail/link_attr")
+        self.assertEqual(la.get("color"), "-8454017")
+        self.assertEqual(la.get("method"), "Walking")
+        self.assertEqual(la.get("order"), "Ascending Check Points")
+        self.assertIsNotNone(root.find("detail/__routeinfo/__navcues"))
+        self.assertEqual(root.find("detail/remarks").text, "rem #x")
+
     def test_polyline_has_no_altitude(self):
         xml = cot.polyline("u1", [(24.5, 60.3), (24.6, 60.4)], "R", "rem", "#00FF00")
         root = ET.fromstring(xml)
@@ -113,11 +131,17 @@ class PipelineTests(unittest.TestCase):
         park = next(e for e in idx["areas"] if e["key"] == "kansallispuistot/nuuksio" and e["lang"] == "fi")
         uids = set(park["uids"])
         self.assertIn("lipas-900020", uids)          # Haukankierros yhdistetty yhdeksi viivaksi
+        with zipfile.ZipFile(out / park["files"]["datapackage"]) as z:
+            r = ET.fromstring(z.read("lipas-900020/lipas-900020.cot"))
+        self.assertEqual(r.get("type"), "b-m-r")      # reitit navigoitavina reitteinä
         self.assertNotIn("lipas-900008", uids)       # Testilaavu suodatettu
         self.assertIn("osm-n1002", uids)             # OSM-käymälä retkikohteen lähellä
         self.assertNotIn("osm-n1001", uids)          # duplikaatti LOI-käymälän kanssa
         self.assertFalse(any(u.startswith("osm-w2001") for u in uids))  # Helsingin WC pois
         self.assertEqual(park["counts"]["kota"], 1)
+        self.assertIn("osm-n3002", uids)             # OSM-laavu, jota ei ole Lipaksessa
+        self.assertNotIn("osm-n3001", uids)          # sama laavu kuin Lipaksessa
+        self.assertNotIn("osm-n3003", uids)          # ei retkikohteiden lähellä
 
         # Datapaketti: manifest + CoT parsittavissa, hashtagit remarksissa
         dp = out / park["files"]["datapackage"]

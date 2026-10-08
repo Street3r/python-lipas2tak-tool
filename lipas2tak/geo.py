@@ -159,8 +159,15 @@ class GridIndex:
         self.cell = cell_deg
         self.cells: dict[tuple[int, int], list] = {}
 
+    # Pituusasteruutu on 3x leveämpi: kattaa hakusäteen koko Suomessa (cos 70° ≈ 0.34)
+    LON_FACTOR = 3
+
+    @classmethod
+    def for_radius(cls, radius_m: float) -> "GridIndex":
+        return cls(cell_deg=max(0.005, radius_m / 111_000.0 * 1.1))
+
     def _key(self, c: Coord) -> tuple[int, int]:
-        return int(math.floor(c[0] / (self.cell * 2))), int(math.floor(c[1] / self.cell))
+        return int(math.floor(c[0] / (self.cell * self.LON_FACTOR))), int(math.floor(c[1] / self.cell))
 
     def add(self, c: Coord, value) -> None:
         self.cells.setdefault(self._key(c), []).append((c, value))

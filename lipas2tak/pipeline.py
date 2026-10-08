@@ -65,7 +65,8 @@ def fetch_raw(settings: Settings, clf: normalize.Classifier) -> RawData:
     if oc.get("enabled"):
         for kind, tags in clf.osm_queries():
             try:
-                els = osm.fetch(client, oc["overpass_url"], tags)
+                urls = [oc["overpass_url"], *(oc.get("overpass_fallback_urls") or [])]
+                els = osm.fetch(client, urls, tags)
             except Exception as e:  # OSM is a supplementary source: errors do not abort the run
                 log.error("OSM query failed (%s %s): %s", kind, tags, e)
                 continue

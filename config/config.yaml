@@ -28,7 +28,12 @@ sources:
     statuses: [active]
   osm:
     enabled: true
-    overpass_url: "https://overpass-api.de/api/interpreter"
+    overpass_url: "https://overpass-api.de/api/interpreter"   # env: LIPAS2TAK_OVERPASS_URL
+    # Tried in order when the main server is busy (504/429) or down. If all fail,
+    # the previous cached result is used.
+    overpass_fallback_urls:
+      - "https://overpass.private.coffee/api/interpreter"
+      - "https://overpass.kumi.systems/api/interpreter"
     # Default OSM filters (overridable per kind in types.yaml): only features
     # near other outdoor features or routes are included (urban toilets are left out).
     context_radius_m: 300

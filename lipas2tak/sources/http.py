@@ -16,6 +16,9 @@ USER_AGENT = "python-lipas2tak-tool (+https://github.com/Street3r/python-lipas2t
 
 
 class CachedClient:
+    # Waits between retries; busy servers (e.g. Overpass 504) need longer pauses
+    BACKOFF_S = (5, 15, 30, 60, 120)
+
     def __init__(self, cache_dir: Path, max_age_h: float = 20.0, delay_s: float = 0.3,
                  timeout_s: float = 60.0, retries: int = 4):
         self.cache_dir = cache_dir
@@ -32,8 +35,19 @@ class CachedClient:
         h = hashlib.sha256(json.dumps([method, url, params, data], sort_keys=True, default=str).encode()).hexdigest()
         return self.cache_dir / f"{h[:32]}.json"
 
+    def cached(self, url: str, params: Any = None, *, method: str = "GET", data: Any = None) -> Any:
+        """Last cached response regardless of age, or None (no network request)."""
+        path = self._key(method, url, params, data)
+        if not path.exists():
+            return None
+        age_h = (time.time() - path.stat().st_mtime) / 3600
+        log.warning("Using cached copy of %s from %.0f h ago", url, age_h)
+        return json.loads(path.read_text(encoding="utf-8"))
+
     def get_json(self, url: str, params: Any = None, *, method: str = "GET", data: Any = None,
-                 use_cache: bool = True) -> Any:
+                 use_cache: bool = True, retries: int | None = None, timeout_s: float | None = None,
+                 stale_ok: bool = False) -> Any:
+        """Fetch JSON. With stale_ok, an expired cached copy is returned if every attempt fails."""
         path = self._key(method, url, params, data)
         if use_cache and path.exists() and time.time() - path.stat().st_mtime < self.max_age_s:
             return json.loads(path.read_text(encoding="utf-8"))
@@ -41,12 +55,13 @@ class CachedClient:
         if wait:
             time.sleep(wait)
         last_err: Exception | None = None
-        for attempt in range(self.retries):
+        retries = retries or self.retries
+        for attempt in range(retries):
             try:
                 if method == "POST":
-                    r = self.session.post(url, params=params, data=data, timeout=self.timeout_s)
+                    r = self.session.post(url, params=params, data=data, timeout=timeout_s or self.timeout_s)
                 else:
-                    r = self.session.get(url, params=params, timeout=self.timeout_s)
+                    r = self.session.get(url, params=params, timeout=timeout_s or self.timeout_s)
                 self._last = time.time()
                 if r.status_code in (429, 502, 503, 504):
                     raise requests.HTTPError(f"{r.status_code}", response=r)
@@ -56,8 +71,14 @@ class CachedClient:
                 return payload
             except (requests.RequestException, ValueError) as e:
                 last_err = e
-                backoff = 2 ** attempt * 2
-                log.warning("Request failed (%s), attempt %d/%d, waiting %ss: %s",
-                            url, attempt + 1, self.retries, backoff, e)
+                if attempt + 1 == retries:
+                    break
+                backoff = self.BACKOFF_S[min(attempt, len(self.BACKOFF_S) - 1)]
+                log.warning("Request failed (%s), attempt %d/%d, retrying in %ss: %s",
+                            url, attempt + 1, retries, backoff, e)
                 time.sleep(backoff)
+        if stale_ok and path.exists():
+            age_h = (time.time() - path.stat().st_mtime) / 3600
+            log.warning("Request failed (%s): using cached copy from %.0f h ago", url, age_h)
+            return json.loads(path.read_text(encoding="utf-8"))
         raise RuntimeError(f"Request failed: {url}") from last_err

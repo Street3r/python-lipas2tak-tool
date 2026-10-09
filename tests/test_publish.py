@@ -73,6 +73,40 @@ class PublishTests(unittest.TestCase):
         self.assertIn("kansallispuistot/nuuksio: +0 new, -0 removed, ~1 changed", log)
 
 
+class FailedPublishTests(PublishTests):
+    def test_publish_cycle(self):
+        pass
+
+    def test_changes_survive_a_failed_publish(self):
+        t1 = datetime(2026, 10, 8, tzinfo=timezone.utc)
+        publish.publish(self.settings, now=t1, **self.kw)
+        raw = self.tmp / "raw"
+        shutil.copytree(FIXTURE, raw)
+        sites = json.loads((raw / "sites.json").read_text())
+        sites[0]["name"] = sites[0]["name"] + " (uusi nimi)"
+        (raw / "sites.json").write_text(json.dumps(sites))
+        self.kw["raw_dir"] = raw
+        orig = publish._git
+
+        def broken(repo, *args, **kw):
+            if args[:1] == ("push",):
+                raise subprocess.CalledProcessError(128, "git push")
+            return orig(repo, *args, **kw)
+
+        publish._git = broken
+        try:
+            with self.assertRaises(subprocess.CalledProcessError):
+                publish.publish(self.settings, now=datetime(2026, 10, 9, tzinfo=timezone.utc), **self.kw)
+        finally:
+            publish._git = orig
+        # Leftover upload branch from the failed attempt is removed by the next success
+        git(self.remote, "branch", "data-upload", "data")
+        publish.publish(self.settings, now=datetime(2026, 10, 9, 1, tzinfo=timezone.utc), **self.kw)
+        log = git(self.remote, "show", "data:CHANGELOG.md")
+        self.assertIn("~1 changed", log)                       # changes not lost by the failed attempt
+        self.assertEqual(git(self.remote, "branch", "--format=%(refname:short)"), "data")
+
+
 class BatchUploadTests(PublishTests):
     def test_publish_cycle(self):  # replaced by the test below
         pass

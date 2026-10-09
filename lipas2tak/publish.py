@@ -153,10 +153,31 @@ def _changelog(old: str, now: datetime, changes: dict, n_features: int) -> str:
     return "# Changelog\n\nLatest updates of the generated data.\n\n" + "\n".join([entry, *kept])
 
 
-def publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, branch: str, base_url: str,
-            repo_name: str = "finland-outdoor-tak-data", dry_run: bool = False,
-            now: Optional[datetime] = None, source_status: Optional[Path] = None) -> str:
-    """Build the public version and push it if anything changed. Returns a status string."""
+def publish(settings: Settings, raw_dir: Path, workdir: Path, *args, dry_run: bool = False, **kw) -> str:
+    """Build the public version and push it if anything changed. Returns a status string.
+
+    The build updates the change-tracking state (cache/state.json). If the
+    publish fails or is a dry run, that state is restored, so the next attempt
+    still records the changes in the changelog.
+    """
+    state = workdir / "cache" / "state.json"
+    backup = state.read_bytes() if state.exists() else None
+    ok = False
+    try:
+        result = _publish(settings, raw_dir, workdir, *args, dry_run=dry_run, **kw)
+        ok = not dry_run
+        return result
+    finally:
+        if not ok:
+            if backup is None:
+                state.unlink(missing_ok=True)
+            else:
+                state.write_bytes(backup)
+
+
+def _publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, branch: str, base_url: str,
+             repo_name: str = "finland-outdoor-tak-data", dry_run: bool = False,
+             now: Optional[datetime] = None, source_status: Optional[Path] = None) -> str:
     now = now or datetime.now(timezone.utc)
     workdir.mkdir(parents=True, exist_ok=True)
     pub = public_settings(settings, workdir, base_url)
@@ -216,6 +237,9 @@ def publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, bra
         log.warning("Push failed; uploading in batches and retrying")
         _push_in_batches(repo, ident)
         _git(repo, "push", "-q", "--force", "origin", f"{commit}:refs/heads/{branch}")
+    # Remove the temporary upload branch (also one left over by an earlier failed attempt)
+    if subprocess.run(["git", "ls-remote", "--exit-code", "--heads", "origin", UPLOAD_BRANCH], cwd=repo,
+                      stdout=subprocess.DEVNULL).returncode == 0:
         _git(repo, "push", "-q", "origin", f":refs/heads/{UPLOAD_BRANCH}", check=False)
     _git(repo, "reset", "-q", "--hard", commit)
     log.info("Published %s to %s: %s", commit[:8], branch, msg)

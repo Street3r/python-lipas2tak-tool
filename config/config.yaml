@@ -107,5 +107,8 @@ outputs:
     kansallispuistot: true
     maakunnat: false
   gpx: true
+  # false: imported packages stay in ATAK's Data Packages list (contents can be hidden or
+  # removed together); true: ATAK deletes the package file after importing its contents
+  datapackage_on_receive_delete: false
   share_pages: true          # share/<lang>/*.html with QR codes (needs public_base_url)
   network_link_refresh_s: 86400

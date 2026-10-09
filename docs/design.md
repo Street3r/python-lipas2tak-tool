@@ -47,7 +47,7 @@ Statistics Fin. ─┘        (generator)                 │
 
 ## CoT formats (from an ATAK-exported reference package)
 
-- Mission Package v2: `MANIFEST/manifest.xml` and `<uid>/<uid>.cot`.
+- Mission Package v2: `MANIFEST/manifest.xml` and `<uid>/<uid>.cot`. `onReceiveDelete=false` (tested in ATAK): the package stays in the Data Packages list after import, so its contents can be hidden or removed together.
 - Package UID = uuid5(area key + content hash). TAK clients skip a package UID they have already imported, so the UID changes whenever the content changes and stays the same otherwise (no needless re-imports). The package name carries the date of the newest change, e.g. `Nuuksion kansallispuisto (fi) 2026-10-21`. CoT items keep stable UIDs (`lipas-<id>`, `osm-<id>` …), so a new version updates existing markers instead of duplicating them. Items removed at the source are not removed from devices by a new package; delete the old package (with its contents) before importing the new one, or use Data Sync.
 - Marker: `a-u-G` with `usericon iconsetpath="<iconset uid>/Retkeily/<icon>.png"`.
 - Route `b-m-r`: `point` 0,0, points as `<link>` elements (`b-m-p-w` at the start, end and named waypoints, `b-m-p-c` in between, relation `c`), `link_attr` (Walking / On Foot / prefix CP / Ascending Check Points), empty `__routeinfo/__navcues`.
@@ -63,7 +63,8 @@ Statistics Fin. ─┘        (generator)                 │
 - Generated: a network link `.kml` per area (to its KMZ), and per language `links/all_<lang>.kml` plus `links/<category>_<lang>.kml` with a folder per category. Regions are `visibility 0` by default (`outputs.root_links_visible`).
 - Per-group network links are off by default (`outputs.network_link_per_group`): the KMZ already has a folder per group, and ~1,000 link files were too many to navigate. Per-group KMZ files are still written.
 - Refresh interval 86,400 s; the data changes weekly.
-- To test: does ATAK fetch children with `visibility 0` before they are switched on; plain HTTP on an internal address; WinTAK behaviour.
+- Tested (ATAK 5.8): importing a network-link `.kml` via `tak://…/import` or a QR code creates a one-off copy, not a refreshing link. Refreshing links must be added by hand (Import → KML Link), so the share pages offer the plain URL (copy button / QR with the URL) instead of an import link.
+- To test: does ATAK fetch children with `visibility 0` before they are switched on; WinTAK behaviour.
 
 ## Data notes (Lipas, October 2026)
 

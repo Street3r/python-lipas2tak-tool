@@ -40,14 +40,17 @@ def package_uid(key: str, digest: str = "") -> str:
 
 def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
           extra_files: list[tuple[str, bytes]] | None = None,
-          remarks: str = "", notice: str = "") -> str:
+          remarks: str = "", notice: str = "", on_receive_delete: bool = False) -> str:
     """items: [(uid, name, cot_xml)], extra_files: [(zip path, content)].
 
     `remarks` is shown with the package in ATAK; `notice` is stored as
     ATTRIBUTION.txt, which ATAK does not import (ignore="true").
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    pkg_uid = package_uid(key, content_hash(items, extra_files, f"{name}\0{remarks}", notice))
+    # onReceiveDelete=false keeps the package listed in ATAK's Data Packages, so its
+    # contents can be hidden or removed together. Part of the UID so a change re-imports.
+    flag = "true" if on_receive_delete else "false"
+    pkg_uid = package_uid(key, content_hash(items, extra_files, f"{name}\0{remarks}\0{flag}", notice))
     contents = []
     for uid, title, _ in items:
         contents.append(
@@ -67,7 +70,7 @@ def write(path: Path, name: str, key: str, items: list[tuple[str, str, str]],
         "   <Configuration>\n"
         f'      <Parameter name="uid" value="{pkg_uid}"/>\n'
         f"      <Parameter name=\"name\" value={quoteattr(name)}/>\n"
-        '      <Parameter name="onReceiveDelete" value="true"/>\n'
+        f'      <Parameter name="onReceiveDelete" value="{flag}"/>\n'
         + remarks_param +
         "   </Configuration>\n"
         "   <Contents>\n" + "\n".join(contents) + "\n   </Contents>\n"

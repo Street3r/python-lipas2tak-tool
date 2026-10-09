@@ -34,9 +34,13 @@ TEXT = {
         "step1": "1. Icon set (install once)",
         "step1_text": "Without it the markers show default icons.",
         "step2": "2. All areas as auto-refreshing layers",
-        "step2_text": "National parks are on by default, regions off. Switch areas on and off in "
-                      "Overlay Manager → Network Resources. Or add the link by hand: Import → KML Link, "
-                      "paste the URL, auto refresh 86400 s.",
+        "step2_text": "ATAK adds an auto-refreshing link only by hand (a QR code or button would import a "
+                      "one-off copy): copy the URL with the button, or scan the QR code with the phone camera "
+                      "and copy the text. Then in ATAK: Import → KML Link → give a name, paste the URL, "
+                      "Auto Refresh on, interval 86400 s. National parks are on by default, regions off; "
+                      "switch areas in Overlay Manager → Network Resources.",
+        "copy": "Copy URL",
+        "copied": "Copied",
         "step3": "3. One area at a time",
         "step3_text": "Data packages contain navigable routes with named waypoints and #hashtags for filtering.",
         "open": "Open in ATAK",
@@ -70,9 +74,13 @@ TEXT = {
         "step1": "1. Kuvakesarja (asennetaan kerran)",
         "step1_text": "Ilman sitä merkit näkyvät oletuskuvakkeilla.",
         "step2": "2. Kaikki alueet päivittyvinä tasoina",
-        "step2_text": "Kansallispuistot ovat oletuksena päällä ja maakunnat pois. Alueet valitaan "
-                      "Overlay Managerin kohdasta Network Resources. Linkin voi lisätä myös käsin: "
-                      "Import → KML Link, liitä osoite, automaattinen päivitys 86400 s.",
+        "step2_text": "ATAK lisää päivittyvän linkin vain käsin (QR-koodi tai painike toisi kertakopion): "
+                      "kopioi osoite painikkeella, tai skannaa QR-koodi puhelimen kameralla ja kopioi teksti. "
+                      "Sitten ATAKissa: Import → KML Link → anna nimi, liitä osoite, Auto Refresh päälle, "
+                      "väli 86400 s. Kansallispuistot ovat oletuksena päällä ja maakunnat pois; alueet "
+                      "valitaan Overlay Managerin kohdasta Network Resources.",
+        "copy": "Kopioi osoite",
+        "copied": "Kopioitu",
         "step3": "3. Yksi alue kerrallaan",
         "step3_text": "Datapaketeissa on navigoitavat reitit nimettyine reittipisteineen ja #hashtagit suodatukseen.",
         "open": "Avaa ATAKissa",
@@ -215,6 +223,24 @@ def _qr_block(label: str, url: str) -> str:
     return (f"<div class='qr'>{svg}<a class='btn' href='{escape(uri)}'>{escape(label)}</a></div>")
 
 
+COPY_JS = """<script>
+document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', e => {
+  e.preventDefault();
+  const done = () => { const t = b.textContent; b.textContent = b.dataset.done; setTimeout(() => b.textContent = t, 1500); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(b.dataset.copy).then(done);
+  else { const a = document.createElement('textarea'); a.value = b.dataset.copy; document.body.appendChild(a);
+         a.select(); document.execCommand('copy'); a.remove(); done(); }
+}));
+</script>"""
+
+
+def _link_block(label: str, url: str, copied: str) -> str:
+    """KML network link: ATAK only creates a refreshing link by hand (Import → KML Link),
+    so the QR code holds the plain URL and the button copies it."""
+    return (f"<div class='qr'>{qr_svg(url)}<a class='btn' href='{escape(url)}' data-copy='{escape(url)}' "
+            f"data-done='{escape(copied)}'>{escape(label)}</a></div>")
+
+
 def _page(lang: str, title: str, body: str, nav: str, attribution: list[str], licence_url: str) -> str:
     t = TEXT[lang]
     return (
@@ -224,7 +250,7 @@ def _page(lang: str, title: str, body: str, nav: str, attribution: list[str], li
         f"<nav>{nav}</nav>"
         f"<p class='muted' id='checked-line' data-interval='{escape(t['interval'])}' hidden>{escape(t['checked'])}: <b id='checked'></b>"
         f"<span id='next-wrap' hidden>, <span id='next'></span></span>. "
-        f"{escape(t['checked_note'])}</p>{body}"
+        f"{escape(t['checked_note'])}</p>{body}{COPY_JS}"
         + CHECKED_JS
         + f"<footer>{escape(t['licence'])}: <a href='{escape(licence_url)}'>ODbL 1.0</a> · "
         f"{' · '.join(escape(a) for a in attribution)}</footer></body></html>\n"
@@ -283,7 +309,7 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
                 cards.append(f"<div class='card'><h3>{escape(label)}</h3>"
                              + (f"<span class='muted'>{escape(t['updated'])} {_fmt_date(upd, lang)}</span>"
                                 if upd else "")
-                             + f"<div class='qrs'>{_qr_block(t['open'], url(links[key]))}</div>"
+                             + f"<div class='qrs'>{_link_block(t['copy'], url(links[key]), t['copied'])}</div>"
                              f"<code>{escape(url(links[key]))}</code></div>")
             body.append(f"<h2>{escape(t['step2'])}</h2><p>{escape(t['step2_text'])}</p>"
                         f"<p class='muted'>{escape(t['kml_note'])}</p><div class='grid'>{''.join(cards)}</div>")
@@ -315,7 +341,7 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
                 if "datapackage" in files:
                     qrs.append(_qr_block(f"{t['package']} → ATAK", url(files["datapackage"])))
                 if "network_link" in files:
-                    qrs.append(_qr_block(f"{t['kml']} → ATAK", url(files["network_link"])))
+                    qrs.append(_link_block(f"{t['kml']}: {t['copy']}", url(files["network_link"]), t["copied"]))
                 dls = [f"<a href='{escape(url(files[k]))}'>{label}</a>"
                        for k, label in (("datapackage", ".zip"), ("kmz", ".kmz"), ("network_link", ".kml"),
                                         ("gpx_zip", "GPX")) if k in files]

@@ -79,7 +79,7 @@ The URLs must stay stable, so the files are served from your own web server (ngi
 
 ### Share pages and QR codes
 
-`share/<lang>/` has a start page (icon set, all-areas network links) and one page per category with a QR code and an "open in ATAK" button for each area's data package and network link. They use ATAK's import URI `tak://com.atakmap.app/import?url=<percent-encoded URL>`; ATAK asks before importing. iTAK and WinTAK use the plain download links. QR codes need `segno` (installed with the package).
+`share/<lang>/` has a start page (icon set, all-areas network links) and one page per category with a QR code and an "open in ATAK" button for each area's data package. Network links cannot be added through an import link (ATAK then imports a one-off copy), so for them the pages show the plain URL with a copy button and a QR code containing the URL, to paste into Import → KML Link. They use ATAK's import URI `tak://com.atakmap.app/import?url=<percent-encoded URL>`; ATAK asks before importing. iTAK and WinTAK use the plain download links. QR codes need `segno` (installed with the package).
 
 ### Publishing
 

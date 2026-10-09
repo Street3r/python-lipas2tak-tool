@@ -258,7 +258,8 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
             version = latest.strftime("%Y-%m-%d") if latest else ""
             package_uid = datapackage.write(p, f"{title} ({lang}) {version}".strip(), f"{area.key}/{lang}",
                                             cot_items, remarks=attribution.SHORT,
-                                            notice=attribution.notice_text())
+                                            notice=attribution.notice_text(),
+                                            on_receive_delete=bool(outs.get("datapackage_on_receive_delete", False)))
             files["datapackage"] = str(p.relative_to(out_root))
         if outs.get("kmz", True) and cot_items:
             p = d / f"{stem}.kmz"

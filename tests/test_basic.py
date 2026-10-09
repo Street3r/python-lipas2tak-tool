@@ -169,6 +169,7 @@ class PipelineTests(unittest.TestCase):
             man = ET.fromstring(z.read("MANIFEST/manifest.xml"))
             ev = ET.fromstring(z.read("lipas-900001/lipas-900001.cot"))
             self.assertIn("OpenStreetMap", z.read("ATTRIBUTION.txt").decode())
+        self.assertEqual(man.find("Configuration/Parameter[@name='onReceiveDelete']").get("value"), "false")
         att = man.find("Contents/Content[@zipEntry='ATTRIBUTION.txt']")
         self.assertEqual(att.get("ignore"), "true")
         rem = ev.find("detail/remarks").text
@@ -202,7 +203,9 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("tak://com.atakmap.app/import?url=https%3A%2F%2Fexample.org%2Flipas2tak%2Fen%2F"
                       "kansallispuistot%2Fnuuksio%2Fnuuksio_en.zip", page)
         start = (out / "share/fi/index.html").read_text()
-        self.assertIn("links%2Fall_fi.kml", start)
+        # Network links: ATAK only adds a refreshing link by hand -> plain URL to copy, no tak:// import
+        self.assertIn("data-copy='https://example.org/lipas2tak/links/all_fi.kml'", start)
+        self.assertNotIn("links%2Fall_fi.kml", start)
         self.assertIn("../en/index.html", start)       # language switch
 
     def test_osm_element_in_two_kinds_kept_once(self):

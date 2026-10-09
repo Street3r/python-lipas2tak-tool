@@ -1,6 +1,7 @@
 """Full run: fetch -> normalise -> enrich -> write outputs -> index.json."""
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -155,12 +156,21 @@ def _digest(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
-ENDPOINTS = {"start": {"fi": "alku", "en": "start"}, "end": {"fi": "loppu", "en": "end"}}
+ENDPOINTS = {"start": {"fi": "alku", "en": "start"}, "end": {"fi": "loppu", "en": "end"},
+             "loop": {"fi": "lähtö ja paluu", "en": "start and finish"}}
 
 def _route_parts(f: Feature) -> list[tuple[str, list]]:
     if len(f.lines) == 1:
         return [(f.uid, f.lines[0])]
     return [(f"{f.uid}-{i}", l) for i, l in enumerate(f.lines, 1)]
+
+
+def _whole(f: Feature) -> Feature:
+    """The feature as a whole network (name without the section length)."""
+    g = copy.copy(f)
+    g.length_km = g.network_km
+    g.network_km = None
+    return g
 
 
 def _since(times: dict, key: str, digest: str, now: datetime) -> datetime:
@@ -188,6 +198,7 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
     outs = settings.get("outputs") or {}
     stroke = float(settings.get("routes", "stroke_weight", default=4.0))
     route_format = settings.get("routes", "cot_format", default="route")
+    snap_m = float(settings.get("routes", "merge_snap_m", default=5.0))
     base_url = (settings.get("public_base_url") or "").rstrip("/")
     entries = []
     feats = sorted(feats, key=lambda f: (kinds[f.kind].group, f.kind, f.name.fi, f.uid))
@@ -218,16 +229,20 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                     digest = _digest(name + rem + repr(line) + repr(f.waypoints and [i for i, _ in f.waypoints]))
                     t = _since(times, f"{area.key}/{lang}:{uid}", digest, now)
                     latest = max(latest, t) if latest else t
-                    if route_format == "shape":
+                    if route_format == "shape" or f.network_km:
+                        # Path network sections are drawn lines: no start/end points per piece
                         xml = cot.polyline(uid, line, name, rem, k.color or "#FF0000", stroke, now=t)
                     else:
+                        loop = geo.is_closed(line, snap_m)
+                        start = ENDPOINTS["loop" if loop else "start"][lang]
+                        end = ENDPOINTS["loop" if loop else "end"][lang]
                         wps = {i: (remarks.display_name(ws[0], kinds[ws[0].kind], lang),
                                    ", ".join(dict.fromkeys(kinds[w.kind].label.get(lang) or kinds[w.kind].label["fi"]
                                                            for w in ws)))
                                for i, ws in f.waypoints}
                         xml = cot.route(uid, line, name, rem, k.color or "#FF0000", waypoints=wps,
-                                        start_name=f"{name} – {ENDPOINTS['start'][lang]}",
-                                        end_name=f"{name} – {ENDPOINTS['end'][lang]}",
+                                        start_name=f"{name} – {start}",
+                                        end_name=f"{name} – {end}",
                                         stroke_weight=stroke, method=k.route_method,
                                         route_kind=k.route_type, now=t)
                     cot_items.append((uid, name, xml))
@@ -235,7 +250,11 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                 line_styles[f"s-{k.key}"] = (k.color or "#FF0000", stroke)
                 folder.placemarks.append(kml.Placemark(f.uid, name, rem, f"s-{k.key}", lines=f.lines))
                 gkey = f.group_uid or f.uid
-                g = gpx_groups.setdefault(gkey, (name, rem, f.www, []))
+                if gkey not in gpx_groups:
+                    whole = _whole(f) if f.network_km else f
+                    gpx_groups[gkey] = (remarks.display_name(whole, k, lang),
+                                        remarks.remarks(whole, k, lang, all_areas, settings), f.www, [])
+                g = gpx_groups[gkey]
                 g[3].append((f.lines[0], {i: remarks.display_name(ws[0], kinds[ws[0].kind], lang)
                                           for i, ws in f.waypoints}))
             else:

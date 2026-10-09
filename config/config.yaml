@@ -78,6 +78,9 @@ routes:
   cot_format: route
   simplify_tolerance_m: 5.0   # Douglas–Peucker
   merge_snap_m: 5.0           # joining of route parts
+  # At path junctions, pieces are joined into the straightest continuation
+  # (turn at most this many degrees), so a network becomes a few long lines
+  junction_max_turn_deg: 60
   stroke_weight: 4.0
   # A route part is included in an area (park) package if at least this share
   # of its length, or at least area_min_inside_m metres, lies inside the area.

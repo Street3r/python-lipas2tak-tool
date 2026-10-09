@@ -147,6 +147,124 @@ def merge_lines(lines: Iterable[Line], snap_m: float = 5.0) -> list[Line]:
     return out
 
 
+def _bearing_out(line: Line, from_start: bool, proj: "LocalProjection", look_m: float = 25.0):
+    """Unit vector pointing from a line end into the line (averaged over ~look_m)."""
+    pts = line if from_start else line[::-1]
+    x0, y0 = proj.fwd(pts[0])
+    x1, y1 = x0, y0
+    for c in pts[1:]:
+        x1, y1 = proj.fwd(c)
+        if math.hypot(x1 - x0, y1 - y0) >= look_m:
+            break
+    d = math.hypot(x1 - x0, y1 - y0)
+    return ((x1 - x0) / d, (y1 - y0) / d) if d else (0.0, 0.0)
+
+
+def _nodes(parts: list[Line], snap_m: float):
+    """Node ids of the line ends: [(start node, end node)], with end points closer than snap_m merged."""
+    lat0 = sum(p[0][1] for p in parts) / len(parts)
+    proj = LocalProjection(lat0)
+    cell = max(snap_m, 0.5)
+    grid: dict[tuple[int, int], list[tuple[float, float, int]]] = {}
+    count = 0
+
+    def node_of(c: Coord) -> int:
+        nonlocal count
+        x, y = proj.fwd(c)
+        kx, ky = int(math.floor(x / cell)), int(math.floor(y / cell))
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for nx, ny, nid in grid.get((kx + dx, ky + dy), ()):
+                    if math.hypot(nx - x, ny - y) <= snap_m:
+                        return nid
+        nid = count
+        count += 1
+        grid.setdefault((kx, ky), []).append((x, y, nid))
+        return nid
+
+    return [(node_of(p[0]), node_of(p[-1])) for p in parts], proj
+
+
+def has_junction(lines: Iterable[Line], snap_m: float = 5.0) -> bool:
+    """True if three or more line ends meet somewhere (the lines form a network)."""
+    parts = [l for l in lines if len(l) >= 2]
+    if len(parts) < 2:
+        return False
+    ends, _ = _nodes(parts, snap_m)
+    deg: dict[int, int] = {}
+    for a, b in ends:
+        deg[a] = deg.get(a, 0) + 1
+        deg[b] = deg.get(b, 0) + 1
+    return any(v >= 3 for v in deg.values())
+
+
+def merge_strokes(lines: Iterable[Line], snap_m: float = 5.0, max_turn_deg: float = 60.0) -> list[Line]:
+    """Join lines into as few continuous lines ("strokes") as is natural.
+
+    Like `merge_lines`, but a chain also continues through a junction: at a
+    node where three or more line ends meet, ends are paired by the straightest
+    continuation (smallest turn, at most `max_turn_deg`). A path network of many
+    short pieces thus becomes a few long lines, and a ring path becomes a loop.
+    """
+    parts = [list(l) for l in lines if len(l) >= 2]
+    if len(parts) <= 1:
+        return parts
+    ends, proj = _nodes(parts, snap_m)
+    at: dict[int, list[tuple[int, int]]] = {}       # node -> [(edge, end 0/1)]
+    for i, (a, b) in enumerate(ends):
+        at.setdefault(a, []).append((i, 0))
+        at.setdefault(b, []).append((i, 1))
+
+    partner: dict[tuple[int, int], tuple[int, int]] = {}
+    cos_limit = math.cos(math.radians(max_turn_deg))
+    for node, es in at.items():
+        if len(es) == 2:
+            partner[es[0]], partner[es[1]] = es[1], es[0]
+            continue
+        if len(es) < 2:
+            continue
+        dirs = {e: _bearing_out(parts[e[0]], e[1] == 0, proj) for e in es}
+        cands = []
+        for x in range(len(es)):
+            for y in range(x + 1, len(es)):
+                u, v = dirs[es[x]], dirs[es[y]]
+                straight = -(u[0] * v[0] + u[1] * v[1])   # 1 = straight on, -1 = U-turn
+                if straight >= cos_limit:
+                    cands.append((-straight, x, y))
+        for _, x, y in sorted(cands):
+            if es[x] not in partner and es[y] not in partner:
+                partner[es[x]], partner[es[y]] = es[y], es[x]
+
+    used = [False] * len(parts)
+
+    def walk(edge: int, enter_end: int) -> Line:
+        coords: Line = []
+        while True:
+            used[edge] = True
+            seg = parts[edge] if enter_end == 0 else parts[edge][::-1]
+            coords.extend(seg if not coords else seg[1:])
+            nxt = partner.get((edge, 1 - enter_end))
+            if nxt is None or used[nxt[0]]:
+                return coords
+            edge, enter_end = nxt
+
+    out: list[Line] = []
+    # Chains starting at a free end (dead end, or an unpaired end at a junction)
+    for i in range(len(parts)):
+        for e in (0, 1):
+            if not used[i] and (i, e) not in partner:
+                out.append(walk(i, e))
+    # Whatever remains are closed loops
+    for i in range(len(parts)):
+        if not used[i]:
+            out.append(walk(i, 0))
+    return out
+
+
+def is_closed(line: Line, snap_m: float = 5.0) -> bool:
+    return len(line) > 2 and haversine(line[0], line[-1]) <= snap_m
+
+
 def snap_to_line(line: Line, pt: Coord, max_dist_m: float):
     """Nearest point on the line: (segment index, t 0..1, point on line, distance m) or None."""
     proj = LocalProjection(pt[1])

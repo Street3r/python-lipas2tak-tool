@@ -48,8 +48,11 @@ class Feature:
     status: str = "active"
     city_code: Optional[int] = None
     updated: str = ""
-    group_uid: str = ""
-    also_kinds: list[str] = field(default_factory=list)  # merged secondary kinds (their hashtags are added)        # shared id of a multi-part route (used to group GPX output)
+    group_uid: str = ""          # shared id of a multi-part route (used to group GPX output)
+    also_kinds: list[str] = field(default_factory=list)  # merged secondary kinds (their hashtags are added)
+    # Unnamed path network (many connected pieces without route names): total
+    # length of the whole network; pieces are drawn as lines, not navigable routes
+    network_km: Optional[float] = None
     # Clusters of features along the route as named waypoints: [(vertex index, [Feature, ...])]
     # (first Feature = cluster representative whose name is shown)
     waypoints: list = field(default_factory=list)

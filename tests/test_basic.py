@@ -11,7 +11,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lipas2tak import geo, pipeline
+from lipas2tak import geo, pipeline, remarks
 from lipas2tak.config import load_settings, slugify
 from lipas2tak.writers import cot
 
@@ -67,6 +67,36 @@ class GeoTests(unittest.TestCase):
         self.assertEqual(len(route.waypoints), 2)                   # cluster + tower
         self.assertEqual(route.waypoints[0][1][0].uid, "laavu")     # the shelter represents the cluster
         self.assertEqual({f.uid for f in route.waypoints[0][1]}, {"laavu", "nuotio", "teltta"})
+
+    def test_merge_strokes_through_junction(self):
+        # A cross: four arms meeting at one point become two straight lines
+        c = (24.5, 60.3)
+        arms = [[c, (24.51, 60.3)], [c, (24.49, 60.3)], [c, (24.5, 60.305)], [c, (24.5, 60.295)]]
+        self.assertEqual(len(geo.merge_lines(arms)), 4)
+        strokes = geo.merge_strokes(arms)
+        self.assertEqual(len(strokes), 2)
+        self.assertTrue(geo.has_junction(arms))
+        self.assertFalse(geo.has_junction(arms[:2]))
+        # A sharp turn is not joined
+        self.assertEqual(len(geo.merge_strokes([[c, (24.51, 60.3)], [c, (24.51, 60.3005)], [c, (24.49, 60.3)]], 5, 60)), 2)
+
+    def test_path_network_sections(self):
+        from lipas2tak import normalize
+        settings = load_settings()
+        clf = normalize.Classifier(settings)
+        c = [24.5, 60.3]
+        def ln(a, b, fid):
+            return {"type": "Feature", "id": fid, "geometry": {"type": "LineString", "coordinates": [a, b]}}
+        site = {"lipas-id": 1, "type": {"type-code": 4405}, "name": "Esimerkkipuiston reitit", "status": "active",
+                "properties": {"route-length-km": 9}, "location": {"geometries": {"features": [
+                    ln(c, [24.51, 60.3], "a"), ln(c, [24.49, 60.3], "b"), ln(c, [24.5, 60.305], "c")]}}}
+        feats = normalize.lipas_site_to_features(site, clf, settings)
+        self.assertEqual(len(feats), 2)
+        self.assertTrue(all(f.network_km and f.group_uid == "lipas-1" for f in feats))
+        kind = settings.kinds[feats[0].kind]
+        name = remarks.display_name(feats[0], kind, "fi")
+        self.assertTrue(name.startswith("Esimerkkipuiston reitit · ") and name.endswith(" km"))
+        self.assertIn("Reitistö yhteensä", remarks.remarks(feats[0], kind, "fi", {}, settings))
 
     def test_merge_lines_loop(self):
         a = [(24.0, 60.0), (24.01, 60.0), (24.01, 60.01)]
@@ -153,7 +183,8 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(r.get("type"), "b-m-r")      # routes as navigable routes
         named = [l.get("callsign") for l in r.findall("detail/link") if l.get("type") == "b-m-p-w"]
         self.assertIn("Kolmoislammen laavu", named)   # rest stop (OSM) along the route as a waypoint
-        self.assertTrue(named[0].endswith("alku") and named[-1].endswith("loppu"))
+        # A loop has one start point: "lähtö ja paluu" at both ends
+        self.assertTrue(named[0].endswith("lähtö ja paluu") and named[-1] == named[0])
         self.assertNotIn("lipas-900008", uids)       # Testilaavu filtered out
         self.assertIn("osm-n1002", uids)             # OSM toilet near an outdoor site
         self.assertNotIn("osm-n1001", uids)          # duplicate of the LOI toilet

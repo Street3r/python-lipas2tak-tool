@@ -40,7 +40,13 @@ T = {
     "admin": {"fi": "Ylläpito", "en": "Maintained by"},
     "temp_closed": {"fi": "TILAPÄISESTI POISSA KÄYTÖSTÄ", "en": "TEMPORARILY OUT OF SERVICE"},
     "src_osm": {"fi": "Lähde: OpenStreetMap", "en": "Source: OpenStreetMap"},
+    "network": {"fi": "Reitistö yhteensä {total} km, tämä osa {part} km",
+                "en": "Trail network {total} km in total, this section {part} km"},
 }
+
+
+def _km(v: float, lang: str) -> str:
+    return f"{v:.1f}".replace(".", "," if lang == "fi" else ".")
 
 
 def _truncate(text: str, n: int) -> str:
@@ -68,8 +74,11 @@ def hashtags(f: Feature, kind: Kind, lang: str, areas: dict[str, AreaDef],
 
 
 def display_name(f: Feature, kind: Kind, lang: str) -> str:
-    n = f.name.get(lang).strip()
-    return n or (kind.label.get(lang) or kind.label["fi"])
+    n = f.name.get(lang).strip() or (kind.label.get(lang) or kind.label["fi"])
+    if f.network_km and f.length_km:
+        # Sections of a path network share the name; the length tells them apart
+        n = f"{n} · {_km(f.length_km, lang)} km"
+    return n
 
 
 def remarks(f: Feature, kind: Kind, lang: str, areas: dict[str, AreaDef], settings: Settings) -> str:
@@ -77,9 +86,11 @@ def remarks(f: Feature, kind: Kind, lang: str, areas: dict[str, AreaDef], settin
     label = kind.label.get(lang) or kind.label["fi"]
     if f.status == "out-of-service-temporarily":
         parts.append(T["temp_closed"][lang])
-    if f.is_route and f.length_km:
-        km = f"{f.length_km:.1f}".replace(".", "," if lang == "fi" else ".")
-        parts.append(f"{label} {km} km")
+    if f.is_route and f.network_km:
+        parts.append(label)
+        parts.append(T["network"][lang].format(total=_km(f.network_km, lang), part=_km(f.length_km or 0, lang)))
+    elif f.is_route and f.length_km:
+        parts.append(f"{label} {_km(f.length_km, lang)} km")
     else:
         parts.append(label)
     if f.marking.get(lang):

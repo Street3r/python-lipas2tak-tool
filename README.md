@@ -15,7 +15,7 @@ Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipa
 | `index.json` / `index.html` | catalogue of outputs for feeders and people |
 | `status.json` | time of the last check and the next scheduled one (shown on the pages) |
 
-Routes are navigable ATAK routes (`b-m-r`); rest stops along a route are named waypoints. Marker `remarks` contain a description, services and hashtags (`#laavu #nuuksio #uusimaa`) that can be used to filter the view in ATAK. Route remarks contain length, trail marking, accessibility and a description.
+Routes are navigable ATAK routes (`b-m-r`); rest stops along a route are named waypoints. A loop route has one start point ("lähtö ja paluu"). Unnamed path networks (a Lipas site with many connected pieces and no route names, e.g. Isojärvi) are drawn as lines (`u-d-f`) without start/end points; each section is named "<site> · 4,6 km" and its remarks give the network's total length. Marker `remarks` contain a description, services and hashtags (`#laavu #nuuksio #uusimaa`) that can be used to filter the view in ATAK. Route remarks contain length, trail marking, accessibility and a description.
 
 The generated content (remarks, hashtags, folder and file names such as `kansallispuistot/nuuksio`) is in Finnish, with English remarks in the `en` outputs.
 

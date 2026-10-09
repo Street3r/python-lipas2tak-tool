@@ -114,7 +114,8 @@ def _activity_routes(site: dict) -> list[dict]:
 
 
 def _prepare_lines(lines: list[geo.Line], settings: Settings) -> list[geo.Line]:
-    merged = geo.merge_lines(lines, settings.get("routes", "merge_snap_m", default=5.0))
+    merged = geo.merge_strokes(lines, settings.get("routes", "merge_snap_m", default=5.0),
+                               settings.get("routes", "junction_max_turn_deg", default=60.0))
     tol = settings.get("routes", "simplify_tolerance_m", default=5.0)
     return [geo.simplify(l, tol) for l in merged if len(l) >= 2]
 
@@ -181,11 +182,16 @@ def lipas_site_to_features(site: dict, clf: Classifier, settings: Settings) -> l
             )
             out.append(f)
     if not out:
-        lines = _prepare_lines(_lines_from_features(features), settings)
+        raw_lines = _lines_from_features(features)
+        lines = _prepare_lines(raw_lines, settings)
         if not lines:
             return []
-        out.append(Feature(uid=f"lipas-{lid}", name=Localized(fi=name, en=name_loc.get("en") or ""),
-                           lines=lines, length_km=props.get("route-length-km"), **base))
+        f = Feature(uid=f"lipas-{lid}", name=Localized(fi=name, en=name_loc.get("en") or ""),
+                    lines=lines, length_km=props.get("route-length-km"), **base)
+        # Connected pieces without route names: a path network, not one route
+        if len(lines) > 1 and geo.has_junction(raw_lines, settings.get("routes", "merge_snap_m", default=5.0)):
+            f.network_km = round(sum(geo.line_length_m(l) for l in lines) / 1000, 1)
+        out.append(f)
     # Disconnected parts become features of their own so that area and region
     # assignment is done per part (long routes may cross several areas).
     # GPX output groups the parts back together.

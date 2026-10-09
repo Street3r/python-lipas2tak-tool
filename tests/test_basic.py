@@ -221,6 +221,16 @@ class PipelineTests(unittest.TestCase):
             ev = ET.fromstring(z.read("osm-n3002/osm-n3002.cot"))
         self.assertTrue(ev.find("detail/usericon").get("iconsetpath").endswith("/laavu.png"))
         self.assertIn("tulipaikka", ev.find("detail/remarks").text)
+        self.assertIn("#nuotiopaikka", ev.find("detail/remarks").text)
+
+    def test_osm_inside_protected_area_kept_without_lipas_context(self):
+        from lipas2tak.model import Feature, Localized
+        from lipas2tak.normalize import dedupe_osm
+        f = Feature(uid="osm-n9", source="osm", source_id="node/9", kind="laavu", name=Localized(),
+                    point=(28.55, 62.05))      # e.g. an island in an archipelago park, nothing in Lipas nearby
+        kw = dict(context_radius_m=1500, dedupe_radius_m=120)
+        self.assertEqual(dedupe_osm([f], [], **kw), [])
+        self.assertEqual(dedupe_osm([f], [], in_area=lambda p: True, **kw), [f])
 
     def test_merge_osm_kinds_rules(self):
         from lipas2tak.model import Feature, Localized

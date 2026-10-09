@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import areas as areas_mod
-from . import attribution, normalize, remarks, waypoints
+from . import attribution, geo, normalize, remarks, waypoints
 from .config import Settings, file_slug
 from .model import AreaDef, Feature
 from .sources import lipas, osm, regions
@@ -100,6 +100,16 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
 
     oc = settings.get("sources", "osm") or {}
     enabled = {k.key for k in settings.enabled_kinds()}
+    # Protected areas are known before OSM filtering: OSM features inside them
+    # count as being in an outdoor context even when Lipas has nothing nearby
+    area_defs = {cat: areas_mod.areas_from_lipas_sites(sites, cat, settings.get("areas", cat),
+                                                       settings.area_names.get(cat))
+                 for cat, sites in raw.area_sites.items()}
+    shapes = [(geo.Area(a.geometry), a.buffer_m) for defs in area_defs.values() for a in defs]
+
+    def in_area(pt) -> bool:
+        return any(shape.within(pt, buf) for shape, buf in shapes)
+
     candidates = {}
     for kind, els in raw.osm.items():
         if kind not in enabled:
@@ -115,7 +125,7 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
             cand, feats,
             context_radius_m=src.get("context_radius_m", oc.get("context_radius_m", 300)),
             dedupe_radius_m=src.get("dedupe_radius_m", oc.get("dedupe_radius_m", 40)),
-            group_of=clf.group_of)
+            group_of=clf.group_of, in_area=in_area)
         log.info("OSM %s: %d/%d included", kind, len(kept), len(cand))
         feats.extend(kept)
 
@@ -127,9 +137,7 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
             groups=wp.get("groups", ["suojat", "tulentekopaikat", "telttailu", "nakotornit"]),
             radius_m=wp.get("radius_m", 75), cluster_m=wp.get("cluster_m", 200))
     all_areas: dict[str, AreaDef] = {}
-    for cat, sites in raw.area_sites.items():
-        defs = areas_mod.areas_from_lipas_sites(sites, cat, settings.get("areas", cat),
-                                                settings.area_names.get(cat))
+    for cat, defs in area_defs.items():
         areas_mod.assign_areas(feats, defs,
                                route_min_share=settings.get("routes", "area_min_share", default=0.3),
                                route_min_inside_m=settings.get("routes", "area_min_inside_m", default=3000))

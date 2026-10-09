@@ -287,6 +287,8 @@ def merge_osm_kinds(candidates: dict[str, list[Feature]],
         win = fs[0]
         for lose in fs[1:]:
             svc = OSM_MERGE_SERVICE.get(lose.kind)
+            if svc and lose.kind not in win.also_kinds:
+                win.also_kinds.append(lose.kind)   # e.g. #nuotiopaikka on a lean-to with a fire pit
             if svc and (win.kind, lose.kind) not in OSM_MERGE_IMPLIED and svc not in win.services:
                 win.services.append(svc)
         out[win.kind].append(win)
@@ -294,8 +296,12 @@ def merge_osm_kinds(candidates: dict[str, list[Feature]],
 
 
 def dedupe_osm(features: Iterable[Feature], context: list[Feature], *, context_radius_m: float,
-               dedupe_radius_m: float, group_of=None) -> list[Feature]:
+               dedupe_radius_m: float, group_of=None, in_area=None) -> list[Feature]:
     """Keep OSM features that are near outdoor features and are not duplicates.
+
+    `in_area(point)`: features inside a protected area (national park etc.) are
+    kept even without nearby Lipas features - e.g. archipelago parks whose
+    shelters are not in Lipas at all.
 
     Duplicate = a feature of the same group (e.g. shelters: lean-to/kota/hut)
     within `dedupe_radius_m`. Lipas/LOI always wins over OSM. Already accepted
@@ -320,6 +326,8 @@ def dedupe_osm(features: Iterable[Feature], context: list[Feature], *, context_r
                 break
             if d <= context_radius_m:
                 near_ctx = True
+        if not dup and not near_ctx and in_area is not None:
+            near_ctx = in_area(p)
         if near_ctx and not dup:
             out.append(f)
             grid.add(p, g)

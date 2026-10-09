@@ -48,8 +48,12 @@ def _truncate(text: str, n: int) -> str:
     return text if len(text) <= n else text[: n - 1].rstrip() + "…"
 
 
-def hashtags(f: Feature, kind: Kind, lang: str, areas: dict[str, AreaDef]) -> list[str]:
+def hashtags(f: Feature, kind: Kind, lang: str, areas: dict[str, AreaDef],
+             kinds: dict[str, Kind] | None = None) -> list[str]:
     tags = [kind.tag.get(lang) or kind.tag["fi"]]
+    for k in f.also_kinds:   # merged secondary kinds, e.g. a lean-to that is also a fire place
+        if kinds and k in kinds:
+            tags.append(kinds[k].tag.get(lang) or kinds[k].tag["fi"])
     for slug in f.areas:
         if slug in areas:
             tags.append(areas[slug].tag)
@@ -96,4 +100,4 @@ def remarks(f: Feature, kind: Kind, lang: str, areas: dict[str, AreaDef], settin
     text = _truncate(" · ".join(parts), int(settings.get("remarks", "max_text_chars", default=500)))
     if f.www:
         text += f" · {f.www}"
-    return f"{text} {' '.join(hashtags(f, kind, lang, areas))}".strip()
+    return f"{text} {' '.join(hashtags(f, kind, lang, areas, settings.kinds))}".strip()

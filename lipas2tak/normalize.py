@@ -116,6 +116,7 @@ def _activity_routes(site: dict) -> list[dict]:
 def _prepare_lines(lines: list[geo.Line], settings: Settings) -> list[geo.Line]:
     merged = geo.merge_strokes(lines, settings.get("routes", "merge_snap_m", default=5.0),
                                settings.get("routes", "junction_max_turn_deg", default=60.0))
+    merged = geo.drop_covered(merged)   # short duplicate pieces on top of longer lines
     tol = settings.get("routes", "simplify_tolerance_m", default=5.0)
     return [geo.simplify(l, tol) for l in merged if len(l) >= 2]
 

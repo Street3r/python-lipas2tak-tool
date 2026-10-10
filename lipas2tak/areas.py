@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import copy
 import re
 import unicodedata
 
@@ -82,6 +83,77 @@ def assign_areas(features: list[Feature], areas: list[AreaDef], route_min_share:
                 f.areas.append(a.key)
                 n += 1
         log.info("%s %s: %d features", a.category, a.name.fi, n)
+
+
+def split_routes_by_region(features: list[Feature], regions: list[AreaDef],
+                           min_piece_km: float = 5.0) -> list[Feature]:
+    """Split long routes at region borders, so each region gets its own section.
+
+    Without this a long route (e.g. EuroVelo across all of Finland) would be
+    put whole into the single region where most of it lies. Runs shorter than
+    `min_piece_km` are merged into the neighbouring run. Routes that stay in
+    one region are returned unchanged.
+    """
+    shapes = [(r.key, geo.Area(r.geometry)) for r in regions]
+
+    def locate(c: geo.Coord) -> str | None:
+        for key, a in shapes:
+            if a.contains(c):
+                return key
+        return None
+
+    out: list[Feature] = []
+    for f in features:
+        if not f.is_route or len(f.lines) != 1:
+            out.append(f)
+            continue
+        line = f.lines[0]
+        step = max(1, len(line) // 20)
+        if len({locate(c) for c in line[::step] + [line[-1]]} - {None}) <= 1:
+            out.append(f)
+            continue
+        # Region of every vertex (outside all regions = same as the previous one)
+        keys: list[str | None] = []
+        prev = None
+        for c in line:
+            k = locate(c) or prev
+            keys.append(k)
+            prev = k
+        # Runs of the same region: [start index, end index, key]
+        runs: list[list] = []
+        for i, k in enumerate(keys):
+            if runs and runs[-1][2] == k:
+                runs[-1][1] = i
+            else:
+                runs.append([i, i, k])
+        def run_km(r) -> float:
+            return line_len(line[max(0, r[0] - 1):r[1] + 1]) / 1000
+        # Merge short runs into the previous (or next) run
+        merged: list[list] = []
+        for r in runs:
+            if merged and (run_km(r) < min_piece_km or merged[-1][2] == r[2]):
+                merged[-1][1] = r[1]
+            else:
+                merged.append(r)
+        if len(merged) > 1 and run_km(merged[0]) < min_piece_km:
+            merged[1][0] = merged[0][0]
+            merged.pop(0)
+        if len(merged) <= 1:
+            out.append(f)
+            continue
+        for n, (a, b, key) in enumerate(merged, 1):
+            g = copy.copy(f)
+            g.uid = f"{f.uid}-m{n}"
+            g.lines = [line[max(0, a - 1) if n > 1 else a:b + 1]]
+            g.length_km = round(line_len(g.lines[0]) / 1000, 1)
+            g.group_uid = f.group_uid or f.uid
+            g.waypoints = []
+            out.append(g)
+    return out
+
+
+def line_len(line: geo.Line) -> float:
+    return geo.line_length_m(line) if len(line) >= 2 else 0.0
 
 
 def assign_regions(features: list[Feature], regions: list[AreaDef], fallback_km: float = 20.0) -> None:

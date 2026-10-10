@@ -131,6 +131,11 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
         feats.extend(kept)
 
     log.info("Features after normalisation: %d", len(feats))
+    regs = regions.fetch_regions_from_features(raw.regions) if raw.regions else []
+    if regs:
+        before = len(feats)
+        feats = areas_mod.split_routes_by_region(feats, regs)
+        log.info("Long routes split at region borders: %d new sections", len(feats) - before)
     wp = settings.get("routes", "waypoints") or {}
     if wp.get("enabled", True):
         waypoints.attach_waypoints(
@@ -143,8 +148,7 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
                                route_min_share=settings.get("routes", "area_min_share", default=0.3),
                                route_min_inside_m=settings.get("routes", "area_min_inside_m", default=3000))
         all_areas.update({a.key: a for a in defs})
-    if raw.regions:
-        regs = regions.fetch_regions_from_features(raw.regions)
+    if regs:
         areas_mod.assign_regions(feats, regs)
         all_areas.update({r.key: r for r in regs})
     return feats, all_areas

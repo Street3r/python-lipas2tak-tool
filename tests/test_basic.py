@@ -75,6 +75,35 @@ class GeoTests(unittest.TestCase):
         self.assertEqual(root.find("detail/remarks").text, "Etelä-Suomen louhikko")
         self.assertEqual(root.find("detail/contact").get("callsign"), "Kuru")
 
+    def test_dashed_line_and_duplicates(self):
+        # A path drawn as 4 m dashes with 3 m gaps becomes one line
+        dashes, lon = [], 24.5
+        for _ in range(30):
+            dashes.append([(lon, 60.3), (lon + 0.00007, 60.3)])
+            lon += 0.00012
+        self.assertEqual(len(geo.merge_strokes(dashes, 5, 60)), 1)
+        # A short piece on top of a longer line is dropped
+        long_line = [(24.5, 60.3), (24.51, 60.3)]
+        dup = [(24.5050, 60.30001), (24.5052, 60.30001)]
+        self.assertEqual(geo.drop_covered([long_line, dup]), [long_line])
+
+    def test_long_route_split_by_region(self):
+        from lipas2tak import areas as areas_mod
+        from lipas2tak.model import AreaDef, Feature, Localized
+        def box(x0, x1):
+            return {"type": "Polygon", "coordinates": [[[x0, 60], [x1, 60], [x1, 61], [x0, 61], [x0, 60]]]}
+        regs = [AreaDef("a", "maakunnat", Localized("A"), "a", box(24, 25)),
+                AreaDef("b", "maakunnat", Localized("B"), "b", box(25, 26))]
+        line = [(24.1 + i * 0.02, 60.5) for i in range(85)]          # 24.1 .. 25.78
+        f = Feature(uid="lipas-9", source="lipas", source_id="9", kind="retkeilyreitti",
+                    name=Localized("Pitkä reitti"), lines=[line])
+        out = areas_mod.split_routes_by_region([f], regs)
+        self.assertEqual([g.uid for g in out], ["lipas-9-m1", "lipas-9-m2"])
+        self.assertTrue(all(g.group_uid == "lipas-9" for g in out))
+        self.assertEqual(out[0].lines[0][-1], out[1].lines[0][0])  # sections connect
+        areas_mod.assign_regions(out, regs)
+        self.assertEqual([g.region for g in out], ["maakunnat/a", "maakunnat/b"])
+
     def test_merge_strokes_through_junction(self):
         # A cross: four arms meeting at one point become two straight lines
         c = (24.5, 60.3)

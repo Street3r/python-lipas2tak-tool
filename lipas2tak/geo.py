@@ -201,39 +201,62 @@ def has_junction(lines: Iterable[Line], snap_m: float = 5.0) -> bool:
 def merge_strokes(lines: Iterable[Line], snap_m: float = 5.0, max_turn_deg: float = 60.0) -> list[Line]:
     """Join lines into as few continuous lines ("strokes") as is natural.
 
-    Like `merge_lines`, but a chain also continues through a junction: at a
-    node where three or more line ends meet, ends are paired by the straightest
-    continuation (smallest turn, at most `max_turn_deg`). A path network of many
-    short pieces thus becomes a few long lines, and a ring path becomes a loop.
+    Line ends closer than `snap_m` are paired greedily, closest and straightest
+    first. Where only two ends meet, they are always joined (a path may turn
+    sharply). Where three or more ends meet (a junction), ends are paired by the
+    straightest continuation, turning at most `max_turn_deg`; the rest stay
+    free. A path network of many short pieces thus becomes a few long lines, a
+    ring path becomes a loop, and a path drawn as short dashes with small gaps
+    (pieces shorter than the snap distance) becomes one line.
     """
     parts = [list(l) for l in lines if len(l) >= 2]
     if len(parts) <= 1:
         return parts
-    ends, proj = _nodes(parts, snap_m)
-    at: dict[int, list[tuple[int, int]]] = {}       # node -> [(edge, end 0/1)]
-    for i, (a, b) in enumerate(ends):
-        at.setdefault(a, []).append((i, 0))
-        at.setdefault(b, []).append((i, 1))
+    lat0 = sum(p[0][1] for p in parts) / len(parts)
+    proj = LocalProjection(lat0)
+    lengths = [line_length_m(p) for p in parts]
+    ends = [(i, e) for i in range(len(parts)) for e in (0, 1)]
+    pos = {(i, e): proj.fwd(parts[i][0 if e == 0 else -1]) for i, e in ends}
+    dirs = {(i, e): _bearing_out(parts[i], e == 0, proj) for i, e in ends}
 
+    cell = max(snap_m, 0.5)
+    grid: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    for k in ends:
+        x, y = pos[k]
+        grid.setdefault((int(math.floor(x / cell)), int(math.floor(y / cell))), []).append(k)
+
+    cands = []
+    near: dict[tuple[int, int], int] = {k: 0 for k in ends}
+    for k in ends:
+        x, y = pos[k]
+        kx, ky = int(math.floor(x / cell)), int(math.floor(y / cell))
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for m in grid.get((kx + dx, ky + dy), ()):
+                    if m <= k:
+                        continue
+                    if m[0] == k[0] and lengths[k[0]] <= 3 * snap_m:
+                        continue          # both ends of one short piece
+                    d = math.hypot(pos[m][0] - x, pos[m][1] - y)
+                    if d > snap_m:
+                        continue
+                    u, v = dirs[k], dirs[m]
+                    straight = -(u[0] * v[0] + u[1] * v[1])   # 1 = straight on, -1 = U-turn
+                    turn = math.degrees(math.acos(max(-1.0, min(1.0, straight))))
+                    cands.append((d + turn * snap_m / 90.0, d, turn, k, m))
+                    near[k] += 1
+                    near[m] += 1
+
+    # An end with several candidates is at a junction (or between dashes going
+    # both ways): there only straight-enough continuations are joined.
+    cos_ok = max_turn_deg
     partner: dict[tuple[int, int], tuple[int, int]] = {}
-    cos_limit = math.cos(math.radians(max_turn_deg))
-    for node, es in at.items():
-        if len(es) == 2:
-            partner[es[0]], partner[es[1]] = es[1], es[0]
+    for _, d, turn, k, m in sorted(cands):
+        if k in partner or m in partner:
             continue
-        if len(es) < 2:
+        if turn > cos_ok and (near[k] > 1 or near[m] > 1):
             continue
-        dirs = {e: _bearing_out(parts[e[0]], e[1] == 0, proj) for e in es}
-        cands = []
-        for x in range(len(es)):
-            for y in range(x + 1, len(es)):
-                u, v = dirs[es[x]], dirs[es[y]]
-                straight = -(u[0] * v[0] + u[1] * v[1])   # 1 = straight on, -1 = U-turn
-                if straight >= cos_limit:
-                    cands.append((-straight, x, y))
-        for _, x, y in sorted(cands):
-            if es[x] not in partner and es[y] not in partner:
-                partner[es[x]], partner[es[y]] = es[y], es[x]
+        partner[k], partner[m] = m, k
 
     used = [False] * len(parts)
 
@@ -242,14 +265,16 @@ def merge_strokes(lines: Iterable[Line], snap_m: float = 5.0, max_turn_deg: floa
         while True:
             used[edge] = True
             seg = parts[edge] if enter_end == 0 else parts[edge][::-1]
-            coords.extend(seg if not coords else seg[1:])
+            if coords and seg[0] == coords[-1]:
+                seg = seg[1:]
+            coords.extend(seg)
             nxt = partner.get((edge, 1 - enter_end))
             if nxt is None or used[nxt[0]]:
                 return coords
             edge, enter_end = nxt
 
     out: list[Line] = []
-    # Chains starting at a free end (dead end, or an unpaired end at a junction)
+    # Chains starting at a free end
     for i in range(len(parts)):
         for e in (0, 1):
             if not used[i] and (i, e) not in partner:
@@ -259,6 +284,25 @@ def merge_strokes(lines: Iterable[Line], snap_m: float = 5.0, max_turn_deg: floa
         if not used[i]:
             out.append(walk(i, 0))
     return out
+
+
+def drop_covered(lines: list[Line], max_len_m: float = 30.0, tol_m: float = 10.0) -> list[Line]:
+    """Drop short pieces that lie on top of a longer line (duplicate digitising).
+
+    A piece shorter than `max_len_m` whose every vertex is within `tol_m` of
+    some longer line adds nothing to the map but clutter.
+    """
+    order = sorted(range(len(lines)), key=lambda i: -line_length_m(lines[i]))
+    kept: list[Line] = []
+    for i in order:
+        l = lines[i]
+        if kept and line_length_m(l) < max_len_m and any(
+                all(snap_to_line(k, c, tol_m) for c in l) for k in kept):
+            continue
+        kept.append(l)
+    # keep the original order
+    keep_ids = {id(l) for l in kept}
+    return [l for l in lines if id(l) in keep_ids]
 
 
 def is_closed(line: Line, snap_m: float = 5.0) -> bool:

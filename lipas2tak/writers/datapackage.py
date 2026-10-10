@@ -16,7 +16,7 @@ import hashlib
 import uuid
 import zipfile
 from pathlib import Path
-from xml.sax.saxutils import quoteattr
+from .xmltext import quoteattr
 from . import ziputil
 
 NAMESPACE = uuid.UUID("6b1c2b9e-1f55-4d0e-9c4a-6c2a3c5d2a10")

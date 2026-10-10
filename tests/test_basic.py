@@ -68,6 +68,13 @@ class GeoTests(unittest.TestCase):
         self.assertEqual(route.waypoints[0][1][0].uid, "laavu")     # the shelter represents the cluster
         self.assertEqual({f.uid for f in route.waypoints[0][1]}, {"laavu", "nuotio", "teltta"})
 
+    def test_control_characters_removed_from_xml(self):
+        # Lipas descriptions can contain e.g. U+0002; one such character breaks the whole KML
+        xml = cot.marker("u1", "a-u-G", 60.0, 24.0, "Kuru\x02", "Etelä-Suo\x02men louhikko", None)
+        root = ET.fromstring(xml)
+        self.assertEqual(root.find("detail/remarks").text, "Etelä-Suomen louhikko")
+        self.assertEqual(root.find("detail/contact").get("callsign"), "Kuru")
+
     def test_merge_strokes_through_junction(self):
         # A cross: four arms meeting at one point become two straight lines
         c = (24.5, 60.3)

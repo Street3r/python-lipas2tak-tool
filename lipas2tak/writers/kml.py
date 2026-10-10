@@ -4,7 +4,7 @@ from __future__ import annotations
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from xml.sax.saxutils import escape, quoteattr
+from .xmltext import escape, quoteattr
 
 from .. import attribution
 from ..geo import Coord, Line

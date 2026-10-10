@@ -6,7 +6,7 @@ not written: ATAK clamps the items to its own elevation model.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from xml.sax.saxutils import quoteattr, escape
+from .xmltext import quoteattr, escape
 
 from ..geo import Line
 

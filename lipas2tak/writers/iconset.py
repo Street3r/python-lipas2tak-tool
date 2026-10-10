@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
-from xml.sax.saxutils import quoteattr
+from .xmltext import quoteattr
 from . import ziputil
 
 ICONSET_UID = "3c1f9a52-8d0e-4c41-9b0a-1a2d5e7f4b61"

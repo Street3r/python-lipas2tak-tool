@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
-from xml.sax.saxutils import escape
+from .xmltext import escape
 
 from .. import attribution
 from ..geo import Line

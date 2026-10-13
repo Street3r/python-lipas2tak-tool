@@ -34,11 +34,12 @@ TEXT = {
         "step1": "1. Icon set (install once)",
         "step1_text": "Without it the markers show default icons.",
         "step2": "2. All areas as auto-refreshing layers",
-        "step2_text": "ATAK adds an auto-refreshing link only by hand (a QR code or button would import a "
-                      "one-off copy): copy the URL with the button, or scan the QR code with the phone camera "
-                      "and copy the text. Then in ATAK: Import → KML Link → give a name, paste the URL, "
-                      "Auto Refresh on, interval 86400 s. National parks are on by default, regions off; "
-                      "switch areas in Overlay Manager → Network Resources.",
+        "step2_text": "Scan the QR code or tap the button on the phone: ATAK adds an auto-refreshing link "
+                      "(Overlay Manager → Network Resources), refreshed daily. National parks are on by default "
+                      "and regions off (they contain the parks too); switch regions on one by one. Other apps: "
+                      "download the .kml file or copy its URL.",
+        "add_link": "Add to ATAK",
+        "layer": "Auto-refreshing layer",
         "copy": "Copy URL",
         "copied": "Copied",
         "step3": "3. One area at a time",
@@ -74,11 +75,12 @@ TEXT = {
         "step1": "1. Kuvakesarja (asennetaan kerran)",
         "step1_text": "Ilman sitä merkit näkyvät oletuskuvakkeilla.",
         "step2": "2. Kaikki alueet päivittyvinä tasoina",
-        "step2_text": "ATAK lisää päivittyvän linkin vain käsin (QR-koodi tai painike toisi kertakopion): "
-                      "kopioi osoite painikkeella, tai skannaa QR-koodi puhelimen kameralla ja kopioi teksti. "
-                      "Sitten ATAKissa: Import → KML Link → anna nimi, liitä osoite, Auto Refresh päälle, "
-                      "väli 86400 s. Kansallispuistot ovat oletuksena päällä ja maakunnat pois; alueet "
-                      "valitaan Overlay Managerin kohdasta Network Resources.",
+        "step2_text": "Skannaa QR-koodi tai paina painiketta puhelimella: ATAK lisää päivittyvän linkin "
+                      "(Overlay Manager → Network Resources), joka päivittyy kerran vuorokaudessa. "
+                      "Kansallispuistot ovat oletuksena päällä ja maakunnat pois (ne sisältävät myös puistot); "
+                      "ota maakunnat käyttöön yksitellen. Muut sovellukset: lataa .kml-tiedosto tai kopioi osoite.",
+        "add_link": "Lisää ATAKiin",
+        "layer": "Päivittyvä taso",
         "copy": "Kopioi osoite",
         "copied": "Kopioitu",
         "step3": "3. Yksi alue kerrallaan",
@@ -241,6 +243,12 @@ def _link_block(label: str, url: str, copied: str) -> str:
             f"data-done='{escape(copied)}'>{escape(label)}</a></div>")
 
 
+def _copy_link(label: str, url: str, copied: str) -> str:
+    """Plain download link and a copy button for a URL (for other apps or adding by hand)."""
+    return (f"<a href='{escape(url)}'>{escape(url.rsplit('/', 1)[-1])}</a>"
+            f"<a href='{escape(url)}' data-copy='{escape(url)}' data-done='{escape(copied)}'>{escape(label)}</a>")
+
+
 def _page(lang: str, title: str, body: str, nav: str, attribution: list[str], licence_url: str) -> str:
     t = TEXT[lang]
     return (
@@ -278,6 +286,7 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
         entries = [e for e in index["areas"] if e["lang"] == lang]
         categories = sorted({e["category"] for e in entries})
         links = (index.get("links") or {}).get(lang, {})
+        link_pkgs = (index.get("link_packages") or {}).get(lang, {})
         other_lang, other_label = t["lang_other"]
 
         def nav(current: str) -> str:
@@ -306,11 +315,14 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
                          else category_titles.get(key, {}).get(lang, key))
                 upd = max((e.get("updated", "") for e in entries if key == "all" or e["category"] == key),
                           default="")
+                pkg = link_pkgs.get(key)
+                qr = (_qr_block(t["add_link"], url(pkg)) if pkg
+                      else _link_block(t["copy"], url(links[key]), t["copied"]))
                 cards.append(f"<div class='card'><h3>{escape(label)}</h3>"
                              + (f"<span class='muted'>{escape(t['updated'])} {_fmt_date(upd, lang)}</span>"
                                 if upd else "")
-                             + f"<div class='qrs'>{_link_block(t['copy'], url(links[key]), t['copied'])}</div>"
-                             f"<code>{escape(url(links[key]))}</code></div>")
+                             + f"<div class='qrs'>{qr}</div>"
+                             f"<p class='dl'>{_copy_link(t['copy'], url(links[key]), t['copied'])}</p></div>")
             body.append(f"<h2>{escape(t['step2'])}</h2><p>{escape(t['step2_text'])}</p>"
                         f"<p class='muted'>{escape(t['kml_note'])}</p><div class='grid'>{''.join(cards)}</div>")
         cat_links = " · ".join(
@@ -340,11 +352,17 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
                 qrs = []
                 if "datapackage" in files:
                     qrs.append(_qr_block(f"{t['package']} → ATAK", url(files["datapackage"])))
-                if "network_link" in files:
+                if "link_package" in files:
+                    qrs.append(_qr_block(f"{t['layer']} → ATAK", url(files["link_package"])))
+                elif "network_link" in files:
                     qrs.append(_link_block(f"{t['kml']}: {t['copy']}", url(files["network_link"]), t["copied"]))
                 dls = [f"<a href='{escape(url(files[k]))}'>{label}</a>"
                        for k, label in (("datapackage", ".zip"), ("kmz", ".kmz"), ("network_link", ".kml"),
                                         ("gpx_zip", "GPX")) if k in files]
+                if "network_link" in files:
+                    nl = url(files["network_link"])
+                    dls.append(f"<a href='{escape(nl)}' data-copy='{escape(nl)}' data-done='{escape(t['copied'])}'>"
+                               f"{escape(t['kml'])}: {escape(t['copy'])}</a>")
                 search = _norm(f"{e['name']} {e['slug']} {e['tag']}")
                 cards.append(
                     f"<div class='card' id='{escape(e['slug'])}' data-search='{escape(search)}' "

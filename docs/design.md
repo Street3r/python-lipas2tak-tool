@@ -63,7 +63,7 @@ Statistics Fin. ─┘        (generator)                 │
 - Generated: a network link `.kml` per area (to its KMZ), and per language `links/all_<lang>.kml` plus `links/<category>_<lang>.kml` with a folder per category. Regions are `visibility 0` by default (`outputs.root_links_visible`).
 - Per-group network links are off by default (`outputs.network_link_per_group`): the KMZ already has a folder per group, and ~1,000 link files were too many to navigate. Per-group KMZ files are still written.
 - Refresh interval 86,400 s; the data changes weekly.
-- Tested (ATAK 5.8): importing a network-link `.kml` via `tak://…/import` or a QR code creates a one-off copy, not a refreshing link. Refreshing links must be added by hand (Import → KML Link), so the share pages offer the plain URL (copy button / QR with the URL) instead of an import link.
+- Tested (ATAK 5.8): importing a network-link `.kml` via `tak://…/import` or a QR code creates a one-off copy, not a refreshing link. A refreshing link is created by importing a *Remote Resource* package instead (`writers/remote_resource.py`, `<area>_<lang>_link.zip` and `links/*_link.zip`): a mission package with one `b-i-r-r` CoT event and `<RemoteResources><RemoteResource name url type refreshSeconds deleteOnExit/>`, the same as ATAK's own export of a Network Resource (verified with an exported package from ATAK). The share pages import that package; the `.kml` URL is still offered for copying.
 - To test: does ATAK fetch children with `visibility 0` before they are switched on; WinTAK behaviour.
 
 ## Data notes (Lipas, October 2026)

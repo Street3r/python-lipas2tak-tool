@@ -9,6 +9,7 @@ Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipa
 | `*_<group>.kmz` | per-group layers (shelters, campfire sites, towers …) |
 | `*.kml` (NetworkLink) | auto-refreshing link to the area's KMZ |
 | `links/all_<lang>.kml`, `links/<category>_<lang>.kml` | one network link file covering all areas, a folder per category |
+| `*_link.zip` (per area and next to each `links/*.kml`) | package that adds the network link to ATAK as an auto-refreshing layer when opened (QR code / button) |
 | `*_gpx.zip` (`<rte>`) | routes that ATAK converts into navigable routes |
 | `iconset/lipas2tak_iconset.zip` | icon set, installed once |
 | `share/<lang>/*.html` | share pages: QR codes and "open in ATAK" links, one page per category and language |
@@ -69,7 +70,7 @@ Files are written to a staging directory and swapped in at once, so features rem
 
 ### KML network links in ATAK
 
-ATAK (4.2.1+) adds network links via **Import → KML Link**: give a name, paste the URL and enable auto refresh with an interval in seconds. The link is listed in Overlay Manager → Network Resources; nested links (the areas in `links/all_<lang>.kml`) appear as child links that can be switched on and off and whose intervals can be changed.
+The easiest way is the `_link.zip` package (QR code or button on the share pages): ATAK imports it and adds the refreshing link itself. It is a mission package with one `b-i-r-r` CoT event holding a `<RemoteResource>` – the same thing ATAK produces when a Network Resource is sent to another device (tested with ATAK 5.x). By hand, ATAK (4.2.1+) adds network links via **Import → KML Link**: give a name, paste the URL and enable auto refresh with an interval in seconds. The link is listed in Overlay Manager → Network Resources; nested links (the areas in `links/all_<lang>.kml`) appear as child links that can be switched on and off and whose intervals can be changed.
 
 - One URL for everything: `<base url>/links/all_fi.kml` (national parks on, regions off by default).
 - A single area: `<base url>/fi/kansallispuistot/nuuksio/nuuksio_fi.kmz`.
@@ -79,7 +80,7 @@ The URLs must stay stable, so the files are served from your own web server (ngi
 
 ### Share pages and QR codes
 
-`share/<lang>/` has a start page (icon set, all-areas network links) and one page per category with a QR code and an "open in ATAK" button for each area's data package. Network links cannot be added through an import link (ATAK then imports a one-off copy), so for them the pages show the plain URL with a copy button and a QR code containing the URL, to paste into Import → KML Link. They use ATAK's import URI `tak://com.atakmap.app/import?url=<percent-encoded URL>`; ATAK asks before importing. iTAK and WinTAK use the plain download links. QR codes need `segno` (installed with the package).
+`share/<lang>/` has a start page (icon set, all-areas network links) and one page per category with a QR code and an "open in ATAK" button for each area's data package. For refreshing layers the QR code and button import the `_link.zip` package (importing the `.kml` itself would only make a one-off copy); the `.kml` file and a copy-URL button are shown below for other apps and for adding by hand. They use ATAK's import URI `tak://com.atakmap.app/import?url=<percent-encoded URL>`; ATAK asks before importing. iTAK and WinTAK use the plain download links. QR codes need `segno` (installed with the package).
 
 ### Publishing
 

@@ -270,9 +270,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("tak://com.atakmap.app/import?url=https%3A%2F%2Fexample.org%2Flipas2tak%2Fen%2F"
                       "kansallispuistot%2Fnuuksio%2Fnuuksio_en.zip", page)
         start = (out / "share/fi/index.html").read_text()
-        # Network links: ATAK only adds a refreshing link by hand -> plain URL to copy, no tak:// import
-        self.assertIn("data-copy='https://example.org/lipas2tak/links/all_fi.kml'", start)
+        # Refreshing links: tak:// import of a Remote Resource package; the .kml URL can be copied
+        self.assertIn("import?url=https%3A%2F%2Fexample.org%2Flipas2tak%2Flinks%2Fall_fi_link.zip", start)
         self.assertNotIn("links%2Fall_fi.kml", start)
+        self.assertIn("data-copy='https://example.org/lipas2tak/links/all_fi.kml'", start)
+        self.assertIn("nuuksio_en_link.zip", page)
         self.assertIn("../en/index.html", start)       # language switch
 
     def test_osm_element_in_two_kinds_kept_once(self):
@@ -395,6 +397,33 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse(list(d.glob("nuuksio_fi_*.kml")))
         self.assertTrue(list(d.glob("nuuksio_fi_*.kmz")))
         self.assertIn("links/all_fi.kml", (out / "index.html").read_text())
+
+    def test_link_packages(self):
+        """Package that adds a refreshing KML link to ATAK (same structure as ATAK's own export)."""
+        self.run_once()
+        out = self.tmp / "out"
+        idx = json.loads((out / "index.json").read_text())
+        self.assertEqual(idx["link_packages"]["fi"]["all"], "links/all_fi_link.zip")
+        park = next(e for e in idx["areas"] if e["key"] == "kansallispuistot/nuuksio" and e["lang"] == "fi")
+        with zipfile.ZipFile(out / park["files"]["link_package"]) as z:
+            names = z.namelist()
+            m = ET.fromstring(z.read("MANIFEST/manifest.xml"))
+            entry = next(c.get("zipEntry") for c in m.iter("Content"))
+            self.assertIn(entry, names)
+            params = {p.get("name"): p.get("value") for p in m.iter("Parameter")}
+            self.assertEqual(params["contentType"], "Remote Resource")
+            ev = ET.fromstring(z.read(entry))
+        self.assertEqual(ev.get("type"), "b-i-r-r")
+        rr = ev.find("detail/RemoteResources/RemoteResource")
+        self.assertEqual(rr.get("url"), "https://example.org/lipas2tak/fi/kansallispuistot/nuuksio/nuuksio_fi.kml")
+        self.assertEqual(rr.get("type"), "KML")
+        self.assertEqual(rr.get("refreshSeconds"), "86400")
+        self.assertEqual(rr.get("deleteOnExit"), "false")
+        self.assertGreater(ev.get("stale"), "2030")
+        # deterministic
+        first = (out / park["files"]["link_package"]).read_bytes()
+        self.run_once()
+        self.assertEqual(first, (out / park["files"]["link_package"]).read_bytes())
 
     def test_change_detection(self):
         self.run_once()

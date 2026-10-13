@@ -17,7 +17,7 @@ from .config import Settings, file_slug
 from .model import AreaDef, Feature
 from .sources import lipas, osm, regions
 from .sources.http import CachedClient
-from .writers import cot, datapackage, gpx, iconset, kml, share
+from .writers import cot, datapackage, gpx, iconset, kml, remote_resource, share
 
 log = logging.getLogger(__name__)
 
@@ -292,6 +292,14 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
                 nl = d / f"{stem}.kml"
                 kml.write_network_link(nl, title, f"{base_url}/{files['kmz']}", outs.get("network_link_refresh_s", 86400))
                 files["network_link"] = str(nl.relative_to(out_root))
+                if outs.get("link_package", True):
+                    # Package that adds the refreshing link to ATAK when opened (QR code / button)
+                    lp = d / f"{stem}_link.zip"
+                    b = geo.Area(area.geometry).bbox
+                    remote_resource.write(lp, title, f"{base_url}/{files['network_link']}",
+                                          outs.get("network_link_refresh_s", 86400),
+                                          point=((b[1] + b[3]) / 2, (b[0] + b[2]) / 2))
+                    files["link_package"] = str(lp.relative_to(out_root))
             if outs.get("kmz_per_group", True):
                 for group, folder in folders.items():
                     if not folder.placemarks:
@@ -355,7 +363,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
             continue
         index_areas.extend(write_area(settings, area, sel, all_areas, staging, now, times))
 
-    links = write_link_collections(settings, index_areas, staging)
+    links, link_packages = write_link_collections(settings, index_areas, staging)
 
     index = {
         "generated": now.isoformat(),
@@ -366,6 +374,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         "license_url": attribution.LICENSE_URL,
         "attribution": attribution.ATTRIBUTION,
         "links": links,
+        "link_packages": link_packages,
         "share": {},
         "areas": index_areas,
     }
@@ -406,15 +415,18 @@ def write_link_collections(settings: Settings, entries: list[dict], out_root: Pa
     """Top-level KML files with network links to every area's KMZ.
 
     Per language: links/all_<lang>.kml (all categories, one folder each) and
-    links/<category>_<lang>.kml (one category). Returns {lang: {"all"|category: path}}.
+    links/<category>_<lang>.kml (one category), each with a `_link.zip` package that adds
+    it to ATAK as a refreshing link. Returns ({lang: {"all"|category: kml path}},
+    {lang: {"all"|category: package path}}).
     """
     outs = settings.get("outputs") or {}
     if not (outs.get("kmz", True) and outs.get("network_link", True) and outs.get("root_links", True)):
-        return {}
+        return {}, {}
     base_url = (settings.get("public_base_url") or "").rstrip("/")
     refresh = outs.get("network_link_refresh_s", 86400)
     visible_cfg = outs.get("root_links_visible") or {}
     result: dict[str, dict[str, str]] = {}
+    packages: dict[str, dict[str, str]] = {}
     for lang in settings.languages:
         sections = []
         for category in sorted({e["category"] for e in entries if e["lang"] == lang}):
@@ -429,11 +441,25 @@ def write_link_collections(settings: Settings, entries: list[dict], out_root: Pa
             path = out_root / "links" / f"{category}_{lang}.kml"
             kml.write_link_collection(path, f"Lipas – {ctitle}", [(ctitle, visible, links)], refresh)
             result.setdefault(lang, {})[category] = f"links/{path.name}"
+            _link_package(outs, path, f"Lipas – {ctitle}", base_url, out_root, refresh, packages, lang, category)
         if sections:
             path = out_root / "links" / f"all_{lang}.kml"
             kml.write_link_collection(path, "Lipas", sections, refresh)
             result.setdefault(lang, {})["all"] = f"links/{path.name}"
-    return result
+            _link_package(outs, path, f"Lipas – {ALL_AREAS[lang]}", base_url, out_root, refresh, packages, lang, "all")
+    return result, packages
+
+
+ALL_AREAS = {"fi": "Kaikki alueet", "en": "All areas"}
+
+
+def _link_package(outs: dict, kml_path: Path, name: str, base_url: str, out_root: Path, refresh: int,
+                  packages: dict, lang: str, key: str) -> None:
+    if not outs.get("link_package", True):
+        return
+    lp = kml_path.with_name(f"{kml_path.stem}_link.zip")
+    remote_resource.write(lp, name, f"{base_url}/links/{kml_path.name}", refresh)
+    packages.setdefault(lang, {})[key] = str(lp.relative_to(out_root))
 
 
 # --- Change tracking --------------------------------------------------------------
@@ -485,8 +511,10 @@ def render_index_html(index: dict) -> str:
         items = []
         for key, rel in sorted(links.items(), key=lambda kv: (kv[0] != "all", kv[0])):
             label = "All areas" if key == "all" else key
+            pkg = ((index.get("link_packages") or {}).get(lang) or {}).get(key)
             items.append(f"<li><a href='{escape(rel)}'>{escape(label)}</a> "
-                         f"<code>{escape(url(rel))}</code></li>")
+                         + (f"(<a href='{escape(pkg)}'>ATAK package</a>) " if pkg else "")
+                         + f"<code>{escape(url(rel))}</code></li>")
         link_rows.append(f"<h3>{escape(LANG_NAMES.get(lang, lang))}</h3><ul>{''.join(items)}</ul>")
 
     rows = []

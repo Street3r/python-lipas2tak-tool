@@ -41,6 +41,8 @@ docker build -t lipas2tak .
 docker run --rm -v "$PWD/data:/data" -e LIPAS2TAK_PUBLIC_BASE_URL=https://example.org/lipas2tak lipas2tak run
 ```
 
+Prebuilt image: `ghcr.io/street3r/python-lipas2tak-tool` (tags `main`, versions such as `0.1.0`, and `sha-<commit>`), built by CI from this repository.
+
 Tests: `python -m unittest discover -s tests`
 
 ### Configuration

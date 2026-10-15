@@ -64,7 +64,7 @@ Statistics Fin. ─┘        (generator)                 │
 - Per-group network links are off by default (`outputs.network_link_per_group`): the KMZ already has a folder per group, and ~1,000 link files were too many to navigate. Per-group KMZ files are still written.
 - Refresh interval 86,400 s; the data changes weekly.
 - Tested (ATAK 5.8): importing a network-link `.kml` via `tak://…/import` or a QR code creates a one-off copy, not a refreshing link. A refreshing link is created by importing a *Remote Resource* package instead (`writers/remote_resource.py`, `<area>_<lang>_link.zip` and `links/*_link.zip`): a mission package with one `b-i-r-r` CoT event and `<RemoteResources><RemoteResource name url type refreshSeconds deleteOnExit/>`, the same as ATAK's own export of a Network Resource (verified with an exported package from ATAK). The share pages import that package; the `.kml` URL is still offered for copying.
-- To test: does ATAK fetch children with `visibility 0` before they are switched on; WinTAK behaviour.
+- Tested (ATAK 5.8): ATAK fetches only the child links that are switched on; children with `visibility 0` are not fetched until switched on. The whole link or single areas can be switched on. A park switched on both on its own and through its region shows its features twice at the same positions (harmless, documented). Auto refresh works. Not tested yet: WinTAK, iTAK.
 
 ## Data notes (Lipas, October 2026)
 
@@ -81,14 +81,16 @@ Statistics Fin. ─┘        (generator)                 │
 1. ✅ Iconset (`defaultGroup`/`skipResize`, `Retkeily/*.png`) works in ATAK 5.8.
 2. ✅ `u-d-f` lines without elevation work; loops need `fillColor 0`.
 3. ✅ Hashtag search works even when tags are at the end of long remarks.
-4. KML Link with `links/all_fi.kml`: child links, visibility, refresh.
+4. ✅ KML Link with `links/all_fi.kml` and `all_en.kml`, category links and single-area KMZ: child links, visibility, refresh.
 5. `b-m-r` routes with named waypoints: navigation and checkpoint names.
 6. GPX `<rte>` → ATAK route; whether `<desc>` ends up in remarks.
-7. KMZ network link refresh in ATAK and WinTAK.
-8. Data package update: a new version (new UID) updates the existing items without duplicates; same content is skipped.
+7. KMZ network link refresh: ✅ ATAK, ✅ TAK Aware; WinTAK and iTAK not tested yet.
+8. ✅ Data package update: a new version (new UID) updates the existing items without duplicates; same content is skipped. The old package stays in Data Packages (delete by hand; the name carries the date). Importing the other language switches the texts.
+9. ✅ A new icon set version updates markers already on the map.
+10. Weekly run: the layer refreshes after the next scheduled publication without a re-import.
 
 ## Next steps
 
-1. ATAK tests per the checklist above.
+1. Remaining tests per the checklist above (5, 6, 10; WinTAK and iTAK later).
 2. Data Sync feeder in docker-lipas-integration.
 3. Wilderness areas and state hiking areas.

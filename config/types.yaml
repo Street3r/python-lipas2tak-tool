@@ -13,6 +13,8 @@
 #   cot_type: CoT type for markers (points)
 #   color:    line colour #RRGGBB (routes)
 #   route_method / route_type: ATAK route link_attr values (default Walking / On Foot)
+#   area_packages: false = left out of the park and region packages; the kind is
+#             then only in the nationwide route type layers (config.yaml route_types)
 #   sources:
 #     lipas:  type_codes + optional name_regex (Python regex, case-insensitive)
 #     loi:    Lipas /v2/lois loi-types
@@ -235,12 +237,38 @@ kinds:
     color: "#1F6FD1"
     sources:
       lipas: {type_codes: [4451, 4452]}
-  # Walking/outdoor routes (4403) are often neighbourhood exercise routes: disabled by default.
+  # Walking/outdoor routes (4403) are often neighbourhood exercise routes:
+  # only in the nationwide "Walking" layer, not in the park and region packages.
   ulkoilureitti:
-    enabled: false
+    area_packages: false
     label: {fi: Ulkoilureitti, en: Outdoor route}
     tag: {fi: ulkoilureitti, en: outdoorroute}
     group: reitit
     color: "#7F8C8D"
     sources:
       lipas: {type_codes: [4403]}
+  # Only in the nationwide route type layers
+  moottorikelkkareitti:
+    area_packages: false
+    label: {fi: Moottorikelkkareitti, en: Snowmobile route}
+    tag: {fi: moottorikelkka, en: snowmobile}
+    group: reitit
+    color: "#00A3D9"
+    sources:
+      lipas: {type_codes: [4421]}   # official routes only (4422 = unofficial trails)
+  hevosreitti:
+    area_packages: false
+    label: {fi: Hevosreitti, en: Horse trail}
+    tag: {fi: ratsastus, en: horseriding}
+    group: reitit
+    color: "#8B5A2B"
+    sources:
+      lipas: {type_codes: [4430]}
+  koiravaljakkoreitti:
+    area_packages: false
+    label: {fi: Koiravaljakkoreitti, en: Dog sledding route}
+    tag: {fi: koiravaljakko, en: dogsledding}
+    group: reitit
+    color: "#B03A8C"
+    sources:
+      lipas: {type_codes: [4441]}

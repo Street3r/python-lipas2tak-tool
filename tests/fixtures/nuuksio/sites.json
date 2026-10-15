@@ -512,5 +512,50 @@
     ]
    }
   }
+ },
+ {
+  "lipas-id": 900022,
+  "type": {
+   "type-code": 4421
+  },
+  "name": "Nuuksion moottorikelkkareitti",
+  "status": "active",
+  "admin": "city-sports",
+  "owner": "city",
+  "comment": "",
+  "properties": {
+   "route-length-km": 6.0
+  },
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "LineString",
+       "coordinates": [
+        [
+         24.48,
+         60.3
+        ],
+        [
+         24.5,
+         60.305
+        ],
+        [
+         24.53,
+         60.3
+        ]
+       ]
+      }
+     }
+    ]
+   }
+  }
  }
 ]

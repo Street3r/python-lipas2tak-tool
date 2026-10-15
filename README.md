@@ -9,6 +9,7 @@ Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipa
 | `*_<group>.kmz` | per-group layers (shelters, campfire sites, towers …) |
 | `*.kml` (NetworkLink) | auto-refreshing link to the area's KMZ |
 | `links/all_<lang>.kml`, `links/<category>_<lang>.kml` | one network link file covering all areas, a folder per category |
+| `links/reitit_<lang>.kml` ("All routes") | nationwide route layers, one KMZ per route type (walking, hiking, cycling, snowmobiling …) |
 | `*_link.zip` (per area and next to each `links/*.kml`) | package that adds the network link to ATAK as an auto-refreshing layer when opened (QR code / button) |
 | `*_gpx.zip` (`<rte>`) | routes that ATAK converts into navigable routes |
 | `iconset/lipas2tak_iconset.zip` | icon set, installed once |
@@ -59,6 +60,7 @@ data/output/
   index.json, index.html
   links/all_<lang>.kml              network links to all areas
   links/kansallispuistot_<lang>.kml, links/maakunnat_<lang>.kml
+  links/reitit_<lang>.kml           network links to the route type layers
   iconset/lipas2tak_iconset.zip
   share/fi|en/index.html, kansallispuistot.html, maakunnat.html   QR codes
   fi|en/kansallispuistot|maakunnat/<slug>/
@@ -66,7 +68,11 @@ data/output/
     <slug>_<lang>.kmz / .kml         all features + network link
     <slug>_<lang>_<group>.kmz/.kml
     <slug>_<lang>_gpx.zip
+  fi|en/reitit/<type>/              nationwide layer per route type (config.yaml route_types)
+    <type>_<lang>.kmz / .kml / _link.zip
 ```
+
+The route type layers are KMZ only (no data packages or GPX for the whole country). Kinds with `area_packages: false` in `types.yaml` (snowmobile, horse and dog sledding routes, outdoor routes 4403) are only in these layers, not in the park and region packages.
 
 Files are written to a staging directory and swapped in at once, so features removed from the sources disappear automatically. Changes since the previous run are logged in `data/cache/changes.jsonl`.
 
@@ -75,6 +81,7 @@ Files are written to a staging directory and swapped in at once, so features rem
 The easiest way is the `_link.zip` package (QR code or button on the share pages): ATAK imports it and adds the refreshing link itself. It is a mission package with one `b-i-r-r` CoT event holding a `<RemoteResource>` – the same thing ATAK produces when a Network Resource is sent to another device (tested with ATAK 5.x). By hand, ATAK (4.2.1+) adds network links via **Import → KML Link**: give a name, paste the URL and enable auto refresh with an interval in seconds. The link is listed in Overlay Manager → Network Resources; nested links (the areas in `links/all_<lang>.kml`) appear as child links that can be switched on and off and whose intervals can be changed.
 
 - One URL for everything: `<base url>/links/all_fi.kml` (national parks on, regions off by default).
+- All routes by type: `<base url>/links/reitit_fi.kml` (each route type is a child link).
 - A single area: `<base url>/fi/kansallispuistot/nuuksio/nuuksio_fi.kmz`.
 - WinTAK and Google Earth: open the `.kml` file.
 
@@ -112,6 +119,7 @@ The data is provided as is; always check current information from the site opera
 
 - Many sites and main trails maintained by Metsähallitus are missing from Lipas (e.g. in Nuuksio). OpenStreetMap fills some of the gaps.
 - Wilderness areas and state hiking areas are not enabled yet.
+- Lipas has no off-road vehicle routes. Snowmobile routes are the official ones (4421); unofficial trails (4422) are left out.
 
 ---
 

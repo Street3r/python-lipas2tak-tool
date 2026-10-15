@@ -73,6 +73,40 @@ areas:
     enabled: true
     title: {fi: Maakunnat, en: Regions}
 
+# Nationwide layers per route type: one KMZ per type, collected in
+# links/reitit_<lang>.kml ("All routes"). Kinds from types.yaml; a kind with
+# area_packages: false is only here.
+route_types:
+  enabled: true
+  title: {fi: Kaikki reitit, en: All routes}
+  # Only KMZ layers and their links (no data packages or GPX for the whole country)
+  outputs: {datapackage: false, gpx: false, kmz_per_group: false}
+  types:
+    kavely:
+      name: {fi: Kävely, en: Walking}
+      kinds: [luontopolku, ulkoilureitti]
+    vaellus:
+      name: {fi: Vaellus, en: Hiking}
+      kinds: [retkeilyreitti]
+    monikaytto:
+      name: {fi: Monikäyttö, en: Multi-use}
+      kinds: [monikayttoreitti]
+    pyoraily:
+      name: {fi: Pyöräily, en: Cycling}
+      kinds: [pyorailyreitti]
+    moottorikelkkailu:
+      name: {fi: Moottorikelkkailu, en: Snowmobiling}
+      kinds: [moottorikelkkareitti]
+    melonta:
+      name: {fi: Melonta, en: Paddling}
+      kinds: [melontareitti]
+    ratsastus:
+      name: {fi: Ratsastus, en: Horse riding}
+      kinds: [hevosreitti]
+    koiravaljakko:
+      name: {fi: Koiravaljakko, en: Dog sledding}
+      kinds: [koiravaljakkoreitti]
+
 routes:
   # CoT format: route = navigable ATAK route (b-m-r), shape = drawn line (u-d-f)
   cot_format: route
@@ -106,9 +140,11 @@ outputs:
   # links/all_<lang>.kml (all categories) and links/<category>_<lang>.kml
   root_links: true
   # Whether the areas of a category are switched on by default in those files
+  # (route types are not in all_<lang>.kml: the parks and regions contain their routes)
   root_links_visible:
     kansallispuistot: true
     maakunnat: false
+    reitit: true
   gpx: true
   # false: imported packages stay in ATAK's Data Packages list (contents can be hidden or
   # removed together); true: ATAK deletes the package file after importing its contents

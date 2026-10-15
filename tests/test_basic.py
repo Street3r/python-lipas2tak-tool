@@ -285,6 +285,8 @@ class PipelineTests(unittest.TestCase):
         out = self.tmp / "out"
         idx = json.loads((out / "index.json").read_text())
         for e in idx["areas"]:
+            if "datapackage" not in e["files"]:   # route type layers: KMZ only
+                continue
             with zipfile.ZipFile(out / e["files"]["datapackage"]) as z:
                 names = z.namelist()
             self.assertEqual(len(names), len(set(names)), e["key"])
@@ -352,6 +354,8 @@ class PipelineTests(unittest.TestCase):
             idx = json.loads((out / "index.json").read_text())
             res = {}
             for e in idx["areas"]:
+                if "datapackage" not in e["files"]:
+                    continue
                 with zipfile.ZipFile(out / e["files"]["datapackage"]) as z:
                     man = ET.fromstring(z.read("MANIFEST/manifest.xml"))
                 uid = man.find("Configuration/Parameter[@name='uid']").get("value")
@@ -397,6 +401,36 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse(list(d.glob("nuuksio_fi_*.kml")))
         self.assertTrue(list(d.glob("nuuksio_fi_*.kmz")))
         self.assertIn("links/all_fi.kml", (out / "index.html").read_text())
+
+    def test_route_type_layers(self):
+        """Nationwide KMZ layer per route type, collected in links/reitit_<lang>.kml."""
+        self.run_once()
+        out = self.tmp / "out"
+        idx = json.loads((out / "index.json").read_text())
+        self.assertEqual(idx["links"]["fi"]["reitit"], "links/reitit_fi.kml")
+        self.assertEqual(idx["link_packages"]["en"]["reitit"], "links/reitit_en_link.zip")
+        ns = {"k": "http://www.opengis.net/kml/2.2"}
+        root = ET.parse(out / "links/reitit_fi.kml").getroot()
+        self.assertEqual(root.find("k:Document/k:name", ns).text, "Lipas – Kaikki reitit")
+        names = [n.find("k:name", ns).text for n in root.iter("{http://www.opengis.net/kml/2.2}NetworkLink")]
+        self.assertEqual(names, ["Kävely", "Moottorikelkkailu", "Vaellus"])
+        # not in the all-areas link (parks and regions already contain their routes)
+        all_root = ET.parse(out / "links/all_fi.kml").getroot()
+        self.assertNotIn("Kaikki reitit", [f.find("k:name", ns).text for f in all_root.iter(
+            "{http://www.opengis.net/kml/2.2}Folder")])
+
+        layers = {e["slug"]: e for e in idx["areas"] if e["category"] == "reitit" and e["lang"] == "fi"}
+        sled = layers["moottorikelkkailu"]
+        self.assertEqual(set(sled["files"]), {"kmz", "network_link", "link_package"})
+        self.assertEqual(set(sled["uids"]), {"lipas-900022"})
+        self.assertIn("lipas-900020", layers["kavely"]["uids"])
+        with zipfile.ZipFile(out / sled["files"]["kmz"]) as z:
+            self.assertIn("Nuuksion moottorikelkkareitti", z.read("doc.kml").decode())
+        # Snowmobile routes are only in the route type layer
+        for e in idx["areas"]:
+            if e["category"] != "reitit":
+                self.assertNotIn("lipas-900022", e["uids"], e["key"])
+        self.assertTrue((out / "share/fi/reitit.html").exists())
 
     def test_link_packages(self):
         """Package that adds a refreshing KML link to ATAK (same structure as ATAK's own export)."""

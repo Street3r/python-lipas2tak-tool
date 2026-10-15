@@ -51,6 +51,7 @@ class Kind:
     enabled: bool = True
     route_method: str = "Walking"   # ATAK route travel method (link_attr method)
     route_type: str = "On Foot"     # ATAK route type (link_attr type)
+    area_packages: bool = True      # false: only in the nationwide route type layers
 
     @property
     def is_route(self) -> bool:
@@ -134,6 +135,7 @@ def load_settings(config_path: str | Path | None = None, types_path: str | Path 
             enabled=k.get("enabled", True),
             route_method=k.get("route_method", "Walking"),
             route_type=k.get("route_type", "On Foot"),
+            area_packages=k.get("area_packages", True),
         )
     names_path = config_path.parent / "area_names.yaml"
     names = yaml.safe_load(names_path.read_text(encoding="utf-8")) if names_path.exists() else {}

@@ -14,7 +14,7 @@ from typing import Optional
 from . import areas as areas_mod
 from . import attribution, geo, normalize, remarks, waypoints
 from .config import Settings, file_slug
-from .model import AreaDef, Feature
+from .model import AreaDef, Feature, Localized
 from .sources import lipas, osm, regions
 from .sources.http import CachedClient
 from .writers import cot, datapackage, gpx, iconset, kml, remote_resource, share
@@ -191,15 +191,17 @@ def _since(times: dict, key: str, digest: str, now: datetime) -> datetime:
 
 
 def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_areas: dict[str, AreaDef],
-               out_root: Path, now: datetime, times: Optional[dict] = None) -> list[dict]:
+               out_root: Path, now: datetime, times: Optional[dict] = None,
+               outputs: Optional[dict] = None) -> list[dict]:
     """Write all outputs of one area in every language. Returns index entries.
 
     `times`: {"<area>/<lang>:<uid>": [digest, iso time]}, updated in place.
+    `outputs`: overrides of the `outputs` settings for this area.
     """
     times = {} if times is None else times
     kinds = settings.kinds
     icons_dir = settings.icon_dirs()
-    outs = settings.get("outputs") or {}
+    outs = {**(settings.get("outputs") or {}), **(outputs or {})}
     stroke = float(settings.get("routes", "stroke_weight", default=4.0))
     route_format = settings.get("routes", "cot_format", default="route")
     snap_m = float(settings.get("routes", "merge_snap_m", default=5.0))
@@ -353,15 +355,20 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     times = _load_state(state_path).get("since", {})
     index_areas = []
     targets = [a for a in all_areas.values() if not only or a.key in only or a.slug in only]
+    in_packages = [f for f in feats if settings.kinds[f.kind].area_packages]
     for area in sorted(targets, key=lambda a: (a.category, a.slug)):
         if area.category == "maakunnat":
-            sel = [f for f in feats if f.region == area.key]
+            sel = [f for f in in_packages if f.region == area.key]
         else:
-            sel = [f for f in feats if area.key in f.areas]
+            sel = [f for f in in_packages if area.key in f.areas]
         if not sel:
             log.info("%s: no features, skipped", area.key)
             continue
         index_areas.extend(write_area(settings, area, sel, all_areas, staging, now, times))
+    route_outs = settings.get("route_types", "outputs", default=None) or {}
+    for area, sel in route_type_areas(settings, feats):
+        if not only or area.key in only or area.slug in only:
+            index_areas.extend(write_area(settings, area, sel, all_areas, staging, now, times, route_outs))
 
     links, link_packages = write_link_collections(settings, index_areas, staging)
 
@@ -379,7 +386,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         "areas": index_areas,
     }
     if (settings.get("outputs") or {}).get("share_pages", True):
-        titles = {c: (settings.get("areas", c, "title", default=None) or {})
+        titles = {c: {lang: _category_title(settings, c, lang) for lang in settings.languages}
                   for c in {e["category"] for e in index_areas}}
         index["share"] = share.write_share_pages(staging, index, titles, settings.languages)
     # When the sources were last checked. Kept in its own small file so that the
@@ -407,8 +414,40 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
 
 
 def _category_title(settings: Settings, category: str, lang: str) -> str:
-    title = settings.get("areas", category, "title", default=None) or {}
+    if category == ROUTE_CATEGORY:
+        title = settings.get("route_types", "title", default=None) or {}
+    else:
+        title = settings.get("areas", category, "title", default=None) or {}
     return title.get(lang) or category
+
+
+ROUTE_CATEGORY = "reitit"
+
+
+def route_type_areas(settings: Settings, feats: list[Feature]) -> list[tuple[AreaDef, list[Feature]]]:
+    """Nationwide route layers: one pseudo-area per route type (config.yaml route_types).
+
+    Written like an area (category "reitit"), so each type gets its own KMZ,
+    network link and link package, and links/reitit_<lang>.kml collects them.
+    """
+    rc = settings.get("route_types") or {}
+    if not rc.get("enabled"):
+        return []
+    result = []
+    for slug, t in (rc.get("types") or {}).items():
+        kinds = set(t.get("kinds") or [])
+        sel = [f for f in feats if f.kind in kinds and f.is_route]
+        if not sel:
+            log.info("route type %s: no routes, skipped", slug)
+            continue
+        xs = [c[0] for f in sel for c in f.all_coords()]
+        ys = [c[1] for f in sel for c in f.all_coords()]
+        x0, y0, x1, y1 = min(xs), min(ys), max(xs), max(ys)
+        bbox = {"type": "Polygon", "coordinates": [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]}
+        name = Localized.from_any(t.get("name") or slug)
+        result.append((AreaDef(slug=slug, category=ROUTE_CATEGORY, name=name, tag=t.get("tag") or slug,
+                               geometry=bbox), sel))
+    return result
 
 
 def write_link_collections(settings: Settings, entries: list[dict], out_root: Path) -> dict:
@@ -437,7 +476,8 @@ def write_link_collections(settings: Settings, entries: list[dict], out_root: Pa
             links = [(e["name"], f"{base_url}/{e['files']['kmz']}") for e in items]
             ctitle = _category_title(settings, category, lang)
             visible = bool(visible_cfg.get(category, True))
-            sections.append((ctitle, visible, links))
+            if category != ROUTE_CATEGORY:   # parks and regions already contain their routes
+                sections.append((ctitle, visible, links))
             path = out_root / "links" / f"{category}_{lang}.kml"
             kml.write_link_collection(path, f"Lipas – {ctitle}", [(ctitle, visible, links)], refresh)
             result.setdefault(lang, {})[category] = f"links/{path.name}"

@@ -6,13 +6,15 @@
 Lipas API ───────┐
 OpenStreetMap ───┼─> python-lipas2tak-tool ──> data/output/ (index.json + files)
 Statistics Fin. ─┘        (generator)                 │
-                                                      ├─> nginx: KMZ/KML/data packages over HTTPS
-                                                      └─> feeder(s): Data Sync missions on TAK Server
+                                                      ├─> publisher: public version → git branch → GitHub Pages
+                                                      ├─> nginx (optional): own web server
+                                                      └─> feeder(s) (planned): Data Sync missions on TAK Server
                                                           (one container per server/group/certificate)
 ```
 
 - **python-lipas2tak-tool** (this repo): fetching, processing and writing files. Knows nothing about TAK Servers.
-- **docker-lipas-integration**: the Compose stack (generator + nginx + feeders).
+- **docker-lipas-integration**: the Compose stack (generator, publisher, optional nginx, planned feeders).
+- **finland-outdoor-tak-data**: the public distribution; the publisher force-pushes the generated files to its `data` branch, served by GitHub Pages.
 - **Feeders**: read `index.json` and push selected areas and languages into Data Sync missions with their own certificate. The same data can be shared to several servers and groups.
 
 ## Processing pipeline
@@ -40,7 +42,7 @@ Statistics Fin. ─┘        (generator)                 │
 | 10 | Remarks | services + short description ≤ 500 characters + link + hashtags |
 | 11 | TAK Server | 5.8; Data Sync per group/channel |
 | 12 | Clients | ATAK 5.8 and WinTAK 5.8 first |
-| 13 | Distribution | public HTTPS on own domain |
+| 13 | Distribution | GitHub Pages (`street3r.github.io/finland-outdoor-tak-data`); an own domain is undecided. Changing the base URL later means users re-add their links |
 | 14 | Deletions | features removed at the source are removed from the output; weekly change log |
 | 15 | Elevation | not written; ATAK uses its own elevation model |
 | 16 | Licence | code MIT; generated data ODbL 1.0 with source attribution ([LICENSE-DATA.md](../LICENSE-DATA.md)) |

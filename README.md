@@ -1,6 +1,6 @@
 # python-lipas2tak-tool
 
-Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipas.fi) (supplemented with OpenStreetMap) and turns them into files for TAK clients (ATAK, WinTAK, iTAK). Output is produced per national park and per region (maakunta), in Finnish and in English.
+Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipas.fi) (supplemented with OpenStreetMap) and turns them into files for TAK clients (ATAK, WinTAK, iTAK). Tested with ATAK 5.8 and TAK Aware; WinTAK and iTAK have not been tested yet. Output is produced per national park and per region (maakunta), in Finnish and in English.
 
 | Output | Use |
 |---|---|

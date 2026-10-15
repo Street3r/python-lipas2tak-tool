@@ -10,7 +10,7 @@ services:
     command: ["run", "--only", "nuuksio", "uusimaa"]
 
   web:
-    image: nginx:1.27-alpine
+    image: nginx:1.31-alpine
     ports: ["8080:80"]
     volumes:
       - ./data/output:/usr/share/nginx/html:ro

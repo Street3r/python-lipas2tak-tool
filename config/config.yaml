@@ -81,10 +81,13 @@ route_types:
   title: {fi: Kaikki reitit, en: All routes}
   # Only KMZ layers and their links (no data packages or GPX for the whole country)
   outputs: {datapackage: false, gpx: false, kmz_per_group: false}
+  # A type with subtypes is a folder with one layer per subtype
   types:
     kavely:
       name: {fi: Kävely, en: Walking}
-      kinds: [luontopolku, ulkoilureitti]
+      subtypes:
+        luontopolut: {name: {fi: Luontopolut, en: Nature trails}, kinds: [luontopolku]}
+        ulkoilureitit: {name: {fi: Ulkoilureitit, en: Outdoor routes}, kinds: [ulkoilureitti]}
     vaellus:
       name: {fi: Vaellus, en: Hiking}
       kinds: [retkeilyreitti]
@@ -93,19 +96,19 @@ route_types:
       kinds: [monikayttoreitti]
     pyoraily:
       name: {fi: Pyöräily, en: Cycling}
-      kinds: [pyorailyreitti]
+      subtypes:
+        pyorailyreitit: {name: {fi: Pyöräilyreitit, en: Cycling routes}, kinds: [pyorailyreitti]}
+        maastopyorailyreitit: {name: {fi: Maastopyöräilyreitit, en: Mountain bike trails}, kinds: [maastopyorailyreitti]}
     moottorikelkkailu:
       name: {fi: Moottorikelkkailu, en: Snowmobiling}
-      kinds: [moottorikelkkareitti]
+      subtypes:
+        moottorikelkkareitit: {name: {fi: Moottorikelkkareitit, en: Snowmobile routes}, kinds: [moottorikelkkareitti]}
+        moottorikelkkaurat: {name: {fi: Moottorikelkkaurat, en: Snowmobile trails}, kinds: [moottorikelkkaura]}
     melonta:
       name: {fi: Melonta, en: Paddling}
-      kinds: [melontareitti]
-    ratsastus:
-      name: {fi: Ratsastus, en: Horse riding}
-      kinds: [hevosreitti]
-    koiravaljakko:
-      name: {fi: Koiravaljakko, en: Dog sledding}
-      kinds: [koiravaljakkoreitti]
+      subtypes:
+        melontareitit: {name: {fi: Melontareitit, en: Canoe routes}, kinds: [melontareitti]}
+        vesiretkeilyreitit: {name: {fi: Vesiretkeilyreitit, en: Water routes}, kinds: [vesiretkeilyreitti]}
 
 routes:
   # CoT format: route = navigable ATAK route (b-m-r), shape = drawn line (u-d-f)

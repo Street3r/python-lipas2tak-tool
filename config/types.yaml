@@ -229,14 +229,28 @@ kinds:
     group: reitit
     color: "#8E44AD"
     sources:
-      lipas: {type_codes: [4411, 4412]}
+      lipas: {type_codes: [4412]}
+  maastopyorailyreitti:
+    label: {fi: Maastopyöräilyreitti, en: Mountain bike trail}
+    tag: {fi: maastopyoraily, en: mtb}
+    group: reitit
+    color: "#5B2C6F"
+    sources:
+      lipas: {type_codes: [4411]}
   melontareitti:
     label: {fi: Melontareitti, en: Canoe route}
     tag: {fi: melonta, en: paddling}
     group: reitit
     color: "#1F6FD1"
     sources:
-      lipas: {type_codes: [4451, 4452]}
+      lipas: {type_codes: [4451]}
+  vesiretkeilyreitti:
+    label: {fi: Vesiretkeilyreitti, en: Water route}
+    tag: {fi: vesiretkeily, en: waterroute}
+    group: reitit
+    color: "#138D90"
+    sources:
+      lipas: {type_codes: [4452]}
   # Walking/outdoor routes (4403) are often neighbourhood exercise routes:
   # only in the nationwide "Walking" layer, not in the park and region packages.
   ulkoilureitti:
@@ -255,20 +269,12 @@ kinds:
     group: reitit
     color: "#00A3D9"
     sources:
-      lipas: {type_codes: [4421]}   # official routes only (4422 = unofficial trails)
-  hevosreitti:
+      lipas: {type_codes: [4421]}   # official routes
+  moottorikelkkaura:
     area_packages: false
-    label: {fi: Hevosreitti, en: Horse trail}
-    tag: {fi: ratsastus, en: horseriding}
+    label: {fi: Moottorikelkkaura, en: Snowmobile trail}
+    tag: {fi: moottorikelkkaura, en: snowmobiletrail}
     group: reitit
-    color: "#8B5A2B"
+    color: "#8E7CC3"
     sources:
-      lipas: {type_codes: [4430]}
-  koiravaljakkoreitti:
-    area_packages: false
-    label: {fi: Koiravaljakkoreitti, en: Dog sledding route}
-    tag: {fi: koiravaljakko, en: dogsledding}
-    group: reitit
-    color: "#B03A8C"
-    sources:
-      lipas: {type_codes: [4441]}
+      lipas: {type_codes: [4422]}   # unofficial: no official route decision

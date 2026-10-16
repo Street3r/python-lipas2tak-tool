@@ -557,5 +557,50 @@
     ]
    }
   }
+ },
+ {
+  "lipas-id": 900023,
+  "type": {
+   "type-code": 4422
+  },
+  "name": "Nuuksion kelkkaura",
+  "status": "active",
+  "admin": "private-association",
+  "owner": "registered-association",
+  "comment": "",
+  "properties": {
+   "route-length-km": 3.0
+  },
+  "event-date": "2026-09-01T10:00:00Z",
+  "location": {
+   "city": {
+    "city-code": 49
+   },
+   "geometries": {
+    "type": "FeatureCollection",
+    "features": [
+     {
+      "type": "Feature",
+      "geometry": {
+       "type": "LineString",
+       "coordinates": [
+        [
+         24.53,
+         60.3
+        ],
+        [
+         24.54,
+         60.295
+        ],
+        [
+         24.55,
+         60.29
+        ]
+       ]
+      }
+     }
+    ]
+   }
+  }
  }
 ]

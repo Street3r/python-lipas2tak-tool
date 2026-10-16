@@ -412,24 +412,34 @@ class PipelineTests(unittest.TestCase):
         ns = {"k": "http://www.opengis.net/kml/2.2"}
         root = ET.parse(out / "links/reitit_fi.kml").getroot()
         self.assertEqual(root.find("k:Document/k:name", ns).text, "Lipas – Kaikki reitit")
-        names = [n.find("k:name", ns).text for n in root.iter("{http://www.opengis.net/kml/2.2}NetworkLink")]
-        self.assertEqual(names, ["Kävely", "Moottorikelkkailu", "Vaellus"])
+        top = root.find("k:Document/k:Folder", ns)
+        # config order; a type with subtypes is a subfolder of links
+        self.assertEqual([c.find("k:name", ns).text for c in top if c.tag.endswith(("Folder", "NetworkLink"))],
+                         ["Kävely", "Vaellus", "Moottorikelkkailu"])
+        sled_folder = top.findall("k:Folder", ns)[1]
+        self.assertEqual([n.find("k:name", ns).text for n in sled_folder.findall("k:NetworkLink", ns)],
+                         ["Moottorikelkkareitit", "Moottorikelkkaurat"])
+        self.assertEqual([n.find("k:name", ns).text for n in top.findall("k:Folder", ns)[0]
+                          .findall("k:NetworkLink", ns)], ["Luontopolut"])
         # not in the all-areas link (parks and regions already contain their routes)
         all_root = ET.parse(out / "links/all_fi.kml").getroot()
         self.assertNotIn("Kaikki reitit", [f.find("k:name", ns).text for f in all_root.iter(
             "{http://www.opengis.net/kml/2.2}Folder")])
 
         layers = {e["slug"]: e for e in idx["areas"] if e["category"] == "reitit" and e["lang"] == "fi"}
-        sled = layers["moottorikelkkailu"]
+        sled = layers["moottorikelkkareitit"]
         self.assertEqual(set(sled["files"]), {"kmz", "network_link", "link_package"})
         self.assertEqual(set(sled["uids"]), {"lipas-900022"})
-        self.assertIn("lipas-900020", layers["kavely"]["uids"])
+        self.assertEqual(set(layers["moottorikelkkaurat"]["uids"]), {"lipas-900023"})
+        self.assertEqual(sled["parent"], "moottorikelkkailu")
+        self.assertIn("lipas-900020", layers["luontopolut"]["uids"])
         with zipfile.ZipFile(out / sled["files"]["kmz"]) as z:
             self.assertIn("Nuuksion moottorikelkkareitti", z.read("doc.kml").decode())
         # Snowmobile routes are only in the route type layer
         for e in idx["areas"]:
             if e["category"] != "reitit":
                 self.assertNotIn("lipas-900022", e["uids"], e["key"])
+                self.assertNotIn("lipas-900023", e["uids"], e["key"])
         self.assertTrue((out / "share/fi/reitit.html").exists())
 
     def test_link_packages(self):

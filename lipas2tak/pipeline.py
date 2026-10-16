@@ -366,9 +366,13 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
             continue
         index_areas.extend(write_area(settings, area, sel, all_areas, staging, now, times))
     route_outs = settings.get("route_types", "outputs", default=None) or {}
-    for area, sel in route_type_areas(settings, feats):
+    for order, (area, sel, parent) in enumerate(route_type_areas(settings, feats)):
         if not only or area.key in only or area.slug in only:
-            index_areas.extend(write_area(settings, area, sel, all_areas, staging, now, times, route_outs))
+            for e in write_area(settings, area, sel, all_areas, staging, now, times, route_outs):
+                e["order"] = order
+                if parent:   # sub-layer: shown in a subfolder of its route type
+                    e["parent"], e["parent_name"] = parent[0], parent[1].get(e["lang"])
+                index_areas.append(e)
 
     links, link_packages = write_link_collections(settings, index_areas, staging)
 
@@ -424,17 +428,27 @@ def _category_title(settings: Settings, category: str, lang: str) -> str:
 ROUTE_CATEGORY = "reitit"
 
 
-def route_type_areas(settings: Settings, feats: list[Feature]) -> list[tuple[AreaDef, list[Feature]]]:
+def route_type_areas(settings: Settings, feats: list[Feature]
+                     ) -> list[tuple[AreaDef, list[Feature], Optional[tuple[str, Localized]]]]:
     """Nationwide route layers: one pseudo-area per route type (config.yaml route_types).
 
     Written like an area (category "reitit"), so each type gets its own KMZ,
     network link and link package, and links/reitit_<lang>.kml collects them.
+    A type with `subtypes` is split into one layer per subtype; the third item
+    is then (type slug, type name), so the links can be put in a subfolder.
     """
     rc = settings.get("route_types") or {}
     if not rc.get("enabled"):
         return []
-    result = []
+    layers = []
     for slug, t in (rc.get("types") or {}).items():
+        name = Localized.from_any(t.get("name") or slug)
+        if t.get("subtypes"):
+            layers.extend((sub, st, (slug, name)) for sub, st in t["subtypes"].items())
+        else:
+            layers.append((slug, t, None))
+    result = []
+    for slug, t, parent in layers:
         kinds = set(t.get("kinds") or [])
         sel = [f for f in feats if f.kind in kinds and f.is_route]
         if not sel:
@@ -446,7 +460,7 @@ def route_type_areas(settings: Settings, feats: list[Feature]) -> list[tuple[Are
         bbox = {"type": "Polygon", "coordinates": [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]}
         name = Localized.from_any(t.get("name") or slug)
         result.append((AreaDef(slug=slug, category=ROUTE_CATEGORY, name=name, tag=t.get("tag") or slug,
-                               geometry=bbox), sel))
+                               geometry=bbox), sel, parent))
     return result
 
 
@@ -470,10 +484,20 @@ def write_link_collections(settings: Settings, entries: list[dict], out_root: Pa
         sections = []
         for category in sorted({e["category"] for e in entries if e["lang"] == lang}):
             items = sorted((e for e in entries if e["lang"] == lang and e["category"] == category
-                            and "kmz" in e["files"]), key=lambda e: e["name"])
+                            and "kmz" in e["files"]), key=lambda e: (e.get("order", 0), e["name"]))
             if not items:
                 continue
-            links = [(e["name"], f"{base_url}/{e['files']['kmz']}") for e in items]
+            links: list = []
+            subfolders: dict[str, list] = {}
+            for e in items:
+                href = f"{base_url}/{e['files']['kmz']}"
+                if e.get("parent"):   # route sub-layers in a subfolder of their type
+                    if e["parent"] not in subfolders:
+                        subfolders[e["parent"]] = []
+                        links.append((e.get("parent_name") or e["parent"], subfolders[e["parent"]]))
+                    subfolders[e["parent"]].append((e["name"], href))
+                else:
+                    links.append((e["name"], href))
             ctitle = _category_title(settings, category, lang)
             visible = bool(visible_cfg.get(category, True))
             if category != ROUTE_CATEGORY:   # parks and regions already contain their routes

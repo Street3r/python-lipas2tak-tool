@@ -9,7 +9,7 @@ Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipa
 | `*_<group>.kmz` | per-group layers (shelters, campfire sites, towers …) |
 | `*.kml` (NetworkLink) | auto-refreshing link to the area's KMZ |
 | `links/all_<lang>.kml`, `links/<category>_<lang>.kml` | one network link file covering all areas, a folder per category |
-| `links/reitit_<lang>.kml` ("All routes") | nationwide route layers, one KMZ per route type (walking, hiking, cycling, snowmobiling …) |
+| `links/reitit_<lang>.kml` ("All routes") | nationwide route layers, one KMZ per route type (walking, hiking, cycling, snowmobiling …); a type with subtypes is a folder with one layer per subtype (e.g. Snowmobiling → official routes / trails) |
 | `*_link.zip` (per area and next to each `links/*.kml`) | package that adds the network link to ATAK as an auto-refreshing layer when opened (QR code / button) |
 | `*_gpx.zip` (`<rte>`) | routes that ATAK converts into navigable routes |
 | `iconset/lipas2tak_iconset.zip` | icon set, installed once |
@@ -68,11 +68,11 @@ data/output/
     <slug>_<lang>.kmz / .kml         all features + network link
     <slug>_<lang>_<group>.kmz/.kml
     <slug>_<lang>_gpx.zip
-  fi|en/reitit/<type>/              nationwide layer per route type (config.yaml route_types)
+  fi|en/reitit/<type>/              nationwide layer per route type or subtype (config.yaml route_types)
     <type>_<lang>.kmz / .kml / _link.zip
 ```
 
-The route type layers are KMZ only (no data packages or GPX for the whole country). Kinds with `area_packages: false` in `types.yaml` (snowmobile, horse and dog sledding routes, outdoor routes 4403) are only in these layers, not in the park and region packages.
+The route type layers are KMZ only (no data packages or GPX for the whole country). Kinds with `area_packages: false` in `types.yaml` (snowmobile routes and trails, outdoor routes 4403) are only in these layers, not in the park and region packages.
 
 Files are written to a staging directory and swapped in at once, so features removed from the sources disappear automatically. Changes since the previous run are logged in `data/cache/changes.jsonl`.
 
@@ -119,7 +119,7 @@ The data is provided as is; always check current information from the site opera
 
 - Many sites and main trails maintained by Metsähallitus are missing from Lipas (e.g. in Nuuksio). OpenStreetMap fills some of the gaps.
 - Wilderness areas and state hiking areas are not enabled yet.
-- Lipas has no off-road vehicle routes. Snowmobile routes are the official ones (4421); unofficial trails (4422) are left out.
+- Lipas has no off-road vehicle routes. Snowmobile routes come from Lipas: official routes (4421) and unofficial trails (4422), as separate layers.
 
 ---
 

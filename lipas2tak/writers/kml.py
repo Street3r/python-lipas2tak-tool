@@ -100,9 +100,10 @@ def write_link_collection(path: Path, name: str, sections: list[tuple[str, bool,
                           refresh_s: int) -> None:
     """One KML file with a folder per section and a NetworkLink per area.
 
-    sections: [(folder name, visible, [(area name, KMZ href)])]. With
-    visible=False the links are off by default and the user turns on the
-    areas they need (whether the client defers fetching depends on the client).
+    sections: [(folder name, visible, [(area name, KMZ href)])]. A link whose
+    href is a list [(name, href)] is a subfolder of links. With visible=False
+    the links are off by default and the user turns on the areas they need
+    (whether the client defers fetching depends on the client).
     """
     def link(n: str, href: str, vis: int) -> str:
         return (f"<NetworkLink><name>{escape(n)}</name><visibility>{vis}</visibility>"
@@ -110,11 +111,12 @@ def write_link_collection(path: Path, name: str, sections: list[tuple[str, bool,
                 f"<Link><href>{escape(href)}</href><refreshMode>onInterval</refreshMode>"
                 f"<refreshInterval>{int(refresh_s)}</refreshInterval></Link></NetworkLink>")
 
-    body = []
-    for folder, visible, links in sections:
-        vis = 1 if visible else 0
-        body.append(f"<Folder><name>{escape(folder)}</name><visibility>{vis}</visibility>"
-                    + "".join(link(n, h, vis) for n, h in links) + "</Folder>")
+    def folder(n: str, links: list, vis: int) -> str:
+        return (f"<Folder><name>{escape(n)}</name><visibility>{vis}</visibility>"
+                + "".join(folder(ln, h, vis) if isinstance(h, list) else link(ln, h, vis) for ln, h in links)
+                + "</Folder>")
+
+    body = [folder(name_, links, 1 if visible else 0) for name_, visible, links in sections]
     doc = ('<?xml version="1.0" encoding="UTF-8"?>\n'
            '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
            f"<name>{escape(name)}</name><description>{escape(attribution.SHORT)}</description>"

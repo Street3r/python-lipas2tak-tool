@@ -91,6 +91,15 @@ sites.append({
                                 "features": [line([[24.4800, 60.3000], [24.5000, 60.3050], [24.5300, 60.3000]])]}},
 })
 
+sites.append({
+    "lipas-id": 900023, "type": {"type-code": 4422}, "name": "Nuuksion kelkkaura", "status": "active",
+    "admin": "private-association", "owner": "registered-association", "comment": "",
+    "properties": {"route-length-km": 3.0}, "event-date": "2026-09-01T10:00:00Z",
+    "location": {"city": {"city-code": 49},
+                 "geometries": {"type": "FeatureCollection",
+                                "features": [line([[24.5300, 60.3000], [24.5400, 60.2950], [24.5500, 60.2900]])]}},
+})
+
 lois = [
     {"id": "aaaaaaaa-0000-4000-8000-000000000001", "loi-type": "dry-toilet", "loi-category": "outdoor-recreation-facilities",
      "name": {"fi": "Haukkalammen kuivakäymälä"}, "status": "active", "event-date": "2026-09-01T10:00:00Z",

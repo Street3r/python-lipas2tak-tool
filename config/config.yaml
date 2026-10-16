@@ -65,7 +65,7 @@ areas:
     strip_from_name: "(?i)\\s*erämaa(-alue)?$"
   valtion_retkeilyalueet:
     enabled: false
-    lipas_type_codes: []   # TODO: type code / data source to be determined
+    lipas_type_codes: [109]   # Lipas "Valtion retkeilyalue" (checked 2026-10)
     label: {fi: Valtion retkeilyalue, en: State hiking area}
     title: {fi: Valtion retkeilyalueet, en: State hiking areas}
     buffer_m: 500

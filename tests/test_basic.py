@@ -286,6 +286,7 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("osm-n3003", wild["uids"])     # OSM lean-to kept: inside a protected area
         self.assertIn("lipas-900009", hike["uids"])
         self.assertTrue((out / "fi/eramaat/kasivarsi/kasivarsi_fi.zip").exists())
+        self.assertFalse(any(e["key"] == "eramaat/koiraharju" for e in idx["areas"]))  # exclude_lipas_ids
         self.assertEqual(idx["links"]["fi"]["valtion_retkeilyalueet"], "links/valtion_retkeilyalueet_fi.kml")
         page = (out / "share/fi/eramaat.html").read_text()
         self.assertIn("Käsivarren erämaa-alue", page)

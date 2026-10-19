@@ -141,7 +141,10 @@ def area_site(lid, type_code, name, ring):
 # lean-to 3003 and the Aulanko lean-to 900009
 area_sites["eramaat"] = [area_site(
     606301, 110, "Käsivarren erämaa-alue",
-    [[25.45, 60.45], [25.55, 60.45], [25.55, 60.55], [25.45, 60.55], [25.45, 60.45]])]
+    [[25.45, 60.45], [25.55, 60.45], [25.55, 60.55], [25.45, 60.55], [25.45, 60.45]]),
+    # excluded in config.yaml (exclude_lipas_ids)
+    area_site(616785, 110, "Koiraharju",
+              [[24.40, 60.27], [24.62, 60.27], [24.62, 60.36], [24.40, 60.36], [24.40, 60.27]])]
 area_sites["valtion_retkeilyalueet"] = [area_site(
     606302, 109, "Ruunaan retkeilyalue",
     [[24.40, 60.98], [24.50, 60.98], [24.50, 61.04], [24.40, 61.04], [24.40, 60.98]])]

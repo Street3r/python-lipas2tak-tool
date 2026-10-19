@@ -69,9 +69,7 @@ eramaat:
 # State hiking areas. Lipas names like "Ruunaan retkeilyalue".
 valtion_retkeilyalueet:
   "Evon": Evo
-  "Hossan": Hossa
   "Iso-Syötteen": Iso-Syöte
   "Kylmäluoman": Kylmäluoma
   "Oulujärven": Oulujärvi
   "Ruunaan": Ruunaa
-  "Teijon": Teijo

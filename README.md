@@ -1,6 +1,6 @@
 # python-lipas2tak-tool
 
-Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipas.fi) (supplemented with OpenStreetMap) and turns them into files for TAK clients (ATAK, WinTAK, iTAK). Tested with ATAK 5.8 and TAK Aware; WinTAK and iTAK have not been tested yet. Output is produced per national park and per region (maakunta), in Finnish and in English.
+Fetches outdoor recreation sites and routes in Finland from [Lipas](https://lipas.fi) (supplemented with OpenStreetMap) and turns them into files for TAK clients (ATAK, WinTAK, iTAK). Tested with ATAK 5.8 and TAK Aware; WinTAK and iTAK have not been tested yet. Output is produced per national park, wilderness area, state hiking area and region (maakunta), in Finnish and in English.
 
 | Output | Use |
 |---|---|
@@ -59,11 +59,11 @@ Tests: `python -m unittest discover -s tests`
 data/output/
   index.json, index.html
   links/all_<lang>.kml              network links to all areas
-  links/kansallispuistot_<lang>.kml, links/maakunnat_<lang>.kml
+  links/<category>_<lang>.kml       kansallispuistot, eramaat, valtion_retkeilyalueet, maakunnat
   links/reitit_<lang>.kml           network links to the route type layers
   iconset/lipas2tak_iconset.zip
-  share/fi|en/index.html, kansallispuistot.html, maakunnat.html   QR codes
-  fi|en/kansallispuistot|maakunnat/<slug>/
+  share/fi|en/index.html, <category>.html   QR codes
+  fi|en/<category>/<slug>/
     <slug>_<lang>.zip               data package
     <slug>_<lang>.kmz / .kml         all features + network link
     <slug>_<lang>_<group>.kmz/.kml
@@ -72,7 +72,7 @@ data/output/
     <type>_<lang>.kmz / .kml / _link.zip
 ```
 
-The route type layers are KMZ only (no data packages or GPX for the whole country). Kinds with `area_packages: false` in `types.yaml` (snowmobile routes and trails, outdoor routes 4403) are only in these layers, not in the park and region packages.
+The route type layers are KMZ only (no data packages or GPX for the whole country). Kinds with `area_packages: false` in `types.yaml` (snowmobile routes and trails, outdoor routes 4403) are only in these layers, not in the area and region packages.
 
 Files are written to a staging directory and swapped in at once, so features removed from the sources disappear automatically. Changes since the previous run are logged in `data/cache/changes.jsonl`.
 
@@ -80,7 +80,7 @@ Files are written to a staging directory and swapped in at once, so features rem
 
 The easiest way is the `_link.zip` package (QR code or button on the share pages): ATAK imports it and adds the refreshing link itself. It is a mission package with one `b-i-r-r` CoT event holding a `<RemoteResource>` – the same thing ATAK produces when a Network Resource is sent to another device (tested with ATAK 5.x). By hand, ATAK (4.2.1+) adds network links via **Import → KML Link**: give a name, paste the URL and enable auto refresh with an interval in seconds. The link is listed in Overlay Manager → Network Resources; nested links (the areas in `links/all_<lang>.kml`) appear as child links that can be switched on and off and whose intervals can be changed.
 
-- One URL for everything: `<base url>/links/all_fi.kml` (national parks on, regions off by default).
+- One URL for everything: `<base url>/links/all_fi.kml` (national parks, wilderness areas and state hiking areas on, regions off by default).
 - All routes by type: `<base url>/links/reitit_fi.kml` (each route type is a child link).
 - A single area: `<base url>/fi/kansallispuistot/nuuksio/nuuksio_fi.kmz`.
 - WinTAK and Google Earth: open the `.kml` file.
@@ -118,11 +118,11 @@ The data is provided as is; always check current information from the site opera
 ## Known limitations
 
 - Many sites and main trails maintained by Metsähallitus are missing from Lipas (e.g. in Nuuksio). OpenStreetMap fills some of the gaps.
-- Wilderness areas and state hiking areas are planned (Lipas types 110 and 109, already in `config/config.yaml`) but not enabled yet.
+- Wilderness areas (Lipas 110) and state hiking areas (Lipas 109) use the boundaries in Lipas; the boundaries themselves are not drawn on the map.
 - Lipas has no off-road vehicle routes. Snowmobile routes come from Lipas: official routes (4421) and unofficial trails (4422), as separate layers.
 
 ---
 
 ## Suomeksi lyhyesti
 
-Työkalu hakee retkeilykohteet ja reitit Lipaksesta (sekä täydentävästi OpenStreetMapista) ja tekee niistä TAK-käyttöön datapaketit, KMZ-tiedostot, KML-verkkolinkit ja GPX-reitit kansallispuistoittain ja maakunnittain, suomeksi ja englanniksi. Merkkien remarks-kentässä on kuvaus, palvelut ja hashtagit suodatusta varten. Koodi on MIT-lisensoitu, ja tuotettu aineisto on ODbL 1.0 -lisensoitu lähdemainintoineen (Lipas / Jyväskylän yliopisto, © OpenStreetMapin tekijät, Tilastokeskus).
+Työkalu hakee retkeilykohteet ja reitit Lipaksesta (sekä täydentävästi OpenStreetMapista) ja tekee niistä TAK-käyttöön datapaketit, KMZ-tiedostot, KML-verkkolinkit ja GPX-reitit kansallispuistoittain, erämaa-alueittain, valtion retkeilyalueittain ja maakunnittain, suomeksi ja englanniksi. Merkkien remarks-kentässä on kuvaus, palvelut ja hashtagit suodatusta varten. Koodi on MIT-lisensoitu, ja tuotettu aineisto on ODbL 1.0 -lisensoitu lähdemainintoineen (Lipas / Jyväskylän yliopisto, © OpenStreetMapin tekijät, Tilastokeskus).

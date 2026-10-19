@@ -130,6 +130,22 @@ area_sites = {"kansallispuistot": [{
         {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [park]}}]}},
 }]}
 
+
+def area_site(lid, type_code, name, ring):
+    return {"lipas-id": lid, "type": {"type-code": type_code}, "name": name, "status": "active",
+            "location": {"city": {"city-code": 49}, "geometries": {"type": "FeatureCollection", "features": [
+                {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [ring]}}]}}}
+
+
+# Placed around existing test features (not the real locations): the lone OSM
+# lean-to 3003 and the Aulanko lean-to 900009
+area_sites["eramaat"] = [area_site(
+    606301, 110, "Käsivarren erämaa-alue",
+    [[25.45, 60.45], [25.55, 60.45], [25.55, 60.55], [25.45, 60.55], [25.45, 60.45]])]
+area_sites["valtion_retkeilyalueet"] = [area_site(
+    606302, 109, "Ruunaan retkeilyalue",
+    [[24.40, 60.98], [24.50, 60.98], [24.50, 61.04], [24.40, 61.04], [24.40, 60.98]])]
+
 regions = [
     {"type": "Feature", "properties": {"maakunta": "01", "nimi": "Uusimaa", "name": "Uusimaa"},
      "geometry": {"type": "Polygon", "coordinates": [[[22.8, 59.8], [26.5, 59.8], [26.5, 60.85], [22.8, 60.85], [22.8, 59.8]]]}},

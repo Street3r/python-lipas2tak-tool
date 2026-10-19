@@ -51,5 +51,105 @@
     }
    }
   }
+ ],
+ "eramaat": [
+  {
+   "lipas-id": 606301,
+   "type": {
+    "type-code": 110
+   },
+   "name": "Käsivarren erämaa-alue",
+   "status": "active",
+   "location": {
+    "city": {
+     "city-code": 49
+    },
+    "geometries": {
+     "type": "FeatureCollection",
+     "features": [
+      {
+       "type": "Feature",
+       "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+         [
+          [
+           25.45,
+           60.45
+          ],
+          [
+           25.55,
+           60.45
+          ],
+          [
+           25.55,
+           60.55
+          ],
+          [
+           25.45,
+           60.55
+          ],
+          [
+           25.45,
+           60.45
+          ]
+         ]
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "valtion_retkeilyalueet": [
+  {
+   "lipas-id": 606302,
+   "type": {
+    "type-code": 109
+   },
+   "name": "Ruunaan retkeilyalue",
+   "status": "active",
+   "location": {
+    "city": {
+     "city-code": 49
+    },
+    "geometries": {
+     "type": "FeatureCollection",
+     "features": [
+      {
+       "type": "Feature",
+       "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+         [
+          [
+           24.4,
+           60.98
+          ],
+          [
+           24.5,
+           60.98
+          ],
+          [
+           24.5,
+           61.04
+          ],
+          [
+           24.4,
+           61.04
+          ],
+          [
+           24.4,
+           60.98
+          ]
+         ]
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
  ]
 }

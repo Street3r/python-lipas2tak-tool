@@ -48,7 +48,8 @@ sources:
 exclude_name_regex: "(?i)\\btesti|testauskohde|testikohde"
 
 areas:
-  # Only areas with enabled: true are produced.
+  # Only areas with enabled: true are produced. The order here is the order of
+  # the categories on the share pages and in links/all_<lang>.kml.
   kansallispuistot:
     enabled: true
     lipas_type_codes: [111]
@@ -57,18 +58,19 @@ areas:
     buffer_m: 500          # include parking and info points at the edge
     strip_from_name: "(?i)\\s*kansallispuisto$"
   eramaat:
-    enabled: false
-    lipas_type_codes: [110]
+    enabled: true
+    lipas_type_codes: [110]   # Lipas "Erämaa-alue" (checked 2026-10)
     label: {fi: Erämaa-alue, en: Wilderness area}
     title: {fi: Erämaa-alueet, en: Wilderness areas}
     buffer_m: 500
     strip_from_name: "(?i)\\s*erämaa(-alue)?$"
   valtion_retkeilyalueet:
-    enabled: false
+    enabled: true
     lipas_type_codes: [109]   # Lipas "Valtion retkeilyalue" (checked 2026-10)
     label: {fi: Valtion retkeilyalue, en: State hiking area}
     title: {fi: Valtion retkeilyalueet, en: State hiking areas}
     buffer_m: 500
+    strip_from_name: "(?i)\\s*(valtion\\s+)?retkeilyalue$"
   maakunnat:
     enabled: true
     title: {fi: Maakunnat, en: Regions}
@@ -146,6 +148,8 @@ outputs:
   # (route types are not in all_<lang>.kml: the parks and regions contain their routes)
   root_links_visible:
     kansallispuistot: true
+    eramaat: true
+    valtion_retkeilyalueet: true
     maakunnat: false
     reitit: true
   gpx: true

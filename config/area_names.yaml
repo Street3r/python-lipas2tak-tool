@@ -2,7 +2,7 @@
 #
 # Lipas names are like "Nuuksion kansallispuisto" (Finnish genitive), so the
 # base form cannot be derived reliably (Oulangan -> Oulanka).
-# Key = the part of the name before "kansallispuisto"/"erämaa-alue".
+# Key = the part of the name before "kansallispuisto"/"erämaa-alue"/"retkeilyalue".
 # For a missing name a fallback rule is used (drop a trailing "n") and a
 # warning is logged so the name can be added here.
 
@@ -50,3 +50,28 @@ kansallispuistot:
   "Urho Kekkosen": Urho Kekkonen
   "Valkmusan": Valkmusa
   "Evon": Evo
+
+# Wilderness areas (erämaalaki 1991). Lipas names like "Käsivarren erämaa-alue".
+eramaat:
+  "Hammastunturin": Hammastunturi
+  "Kaldoaivin": Kaldoaivi
+  "Käsivarren": Käsivarsi
+  "Kemihaaran": Kemihaara
+  "Muotkatunturin": Muotkatunturi
+  "Paistunturin": Paistunturi
+  "Puljun": Pulju
+  "Pöyrisjärven": Pöyrisjärvi
+  "Tarvantovaaran": Tarvantovaara
+  "Tsarmitunturin": Tsarmitunturi
+  "Tuntsan": Tuntsa
+  "Vätsärin": Vätsäri
+
+# State hiking areas. Lipas names like "Ruunaan retkeilyalue".
+valtion_retkeilyalueet:
+  "Evon": Evo
+  "Hossan": Hossa
+  "Iso-Syötteen": Iso-Syöte
+  "Kylmäluoman": Kylmäluoma
+  "Oulujärven": Oulujärvi
+  "Ruunaan": Ruunaa
+  "Teijon": Teijo

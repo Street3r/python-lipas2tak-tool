@@ -285,6 +285,8 @@ class PipelineTests(unittest.TestCase):
         hike = next(e for e in idx["areas"] if e["key"] == "valtion_retkeilyalueet/ruunaa" and e["lang"] == "en")
         self.assertIn("osm-n3003", wild["uids"])     # OSM lean-to kept: inside a protected area
         self.assertIn("lipas-900009", hike["uids"])
+        self.assertEqual(hike["name"], "Ruunaa Hiking Area")   # no English name in Lipas: name_en
+        self.assertEqual(wild["name"], "Käsivarren erämaa-alue")
         self.assertTrue((out / "fi/eramaat/kasivarsi/kasivarsi_fi.zip").exists())
         self.assertFalse(any(e["key"] == "eramaat/koiraharju" for e in idx["areas"]))  # exclude_lipas_ids
         self.assertEqual(idx["links"]["fi"]["valtion_retkeilyalueet"], "links/valtion_retkeilyalueet_fi.kml")
@@ -294,6 +296,13 @@ class PipelineTests(unittest.TestCase):
         nav = page[page.index("<nav>"):page.index("</nav>")]
         order = [nav.index(t) for t in ("Kansallispuistot", "Erämaa-alueet", "Valtion retkeilyalueet", "Maakunnat")]
         self.assertEqual(order, sorted(order))
+
+    def test_coverage_report(self):
+        from lipas2tak import coverage
+        rep = coverage.report(FIXTURE, ["kansallispuistot"])
+        self.assertIn("Testilaavu | lipas:900008", rep)
+        self.assertIn("area_packages false", rep)
+        self.assertIn("osm:node/3001", rep)          # duplicate of the Lipas lean-to
 
     def test_osm_element_in_two_kinds_kept_once(self):
         # Kolmoislammen laavu (kept as laavu) also tagged as a fire pit

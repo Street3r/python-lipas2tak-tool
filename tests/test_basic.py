@@ -277,6 +277,24 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("nuuksio_en_link.zip", page)
         self.assertIn("../en/index.html", start)       # language switch
 
+    def test_wilderness_and_state_hiking_areas(self):
+        self.run_once()
+        out = self.tmp / "out"
+        idx = json.loads((out / "index.json").read_text())
+        wild = next(e for e in idx["areas"] if e["key"] == "eramaat/kasivarsi" and e["lang"] == "fi")
+        hike = next(e for e in idx["areas"] if e["key"] == "valtion_retkeilyalueet/ruunaa" and e["lang"] == "en")
+        self.assertIn("osm-n3003", wild["uids"])     # OSM lean-to kept: inside a protected area
+        self.assertIn("lipas-900009", hike["uids"])
+        self.assertTrue((out / "fi/eramaat/kasivarsi/kasivarsi_fi.zip").exists())
+        self.assertFalse(any(e["key"] == "eramaat/koiraharju" for e in idx["areas"]))  # exclude_lipas_ids
+        self.assertEqual(idx["links"]["fi"]["valtion_retkeilyalueet"], "links/valtion_retkeilyalueet_fi.kml")
+        page = (out / "share/fi/eramaat.html").read_text()
+        self.assertIn("Käsivarren erämaa-alue", page)
+        self.assertIn("#kasivarsi", page)
+        nav = page[page.index("<nav>"):page.index("</nav>")]
+        order = [nav.index(t) for t in ("Kansallispuistot", "Erämaa-alueet", "Valtion retkeilyalueet", "Maakunnat")]
+        self.assertEqual(order, sorted(order))
+
     def test_osm_element_in_two_kinds_kept_once(self):
         # Kolmoislammen laavu (kept as laavu) also tagged as a fire pit
         el = next(e for e in self.raw.osm["laavu"] if e["id"] == 3002)
@@ -390,11 +408,13 @@ class PipelineTests(unittest.TestCase):
         ns = {"k": "http://www.opengis.net/kml/2.2"}
         root = ET.parse(out / "links/all_fi.kml").getroot()
         folders = root.findall("k:Document/k:Folder", ns)
-        self.assertEqual([f.find("k:name", ns).text for f in folders], ["Kansallispuistot", "Maakunnat"])
+        self.assertEqual([f.find("k:name", ns).text for f in folders],
+                         ["Kansallispuistot", "Erämaa-alueet", "Valtion retkeilyalueet", "Maakunnat"])
         hrefs = [h.text for h in root.iter("{http://www.opengis.net/kml/2.2}href")]
         self.assertIn("https://example.org/lipas2tak/fi/kansallispuistot/nuuksio/nuuksio_fi.kmz", hrefs)
         # regions are off by default
-        self.assertEqual(folders[1].find("k:NetworkLink/k:visibility", ns).text, "0")
+        self.assertEqual(folders[1].find("k:NetworkLink/k:visibility", ns).text, "1")
+        self.assertEqual(folders[3].find("k:NetworkLink/k:visibility", ns).text, "0")
         # per-area link stays, per-group links are off by default
         d = out / "fi/kansallispuistot/nuuksio"
         self.assertTrue((d / "nuuksio_fi.kml").exists())

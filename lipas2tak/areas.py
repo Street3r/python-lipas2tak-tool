@@ -30,8 +30,11 @@ def areas_from_lipas_sites(sites: list[dict], category: str, cfg: dict,
                            names: dict[str, str] | None = None) -> list[AreaDef]:
     strip = re.compile(cfg.get("strip_from_name") or r"(?!x)x")
     names = names or {}
+    skip = set(cfg.get("exclude_lipas_ids") or [])
     out = []
     for s in sites:
+        if s.get("lipas-id") in skip:
+            continue
         feats = ((s.get("location") or {}).get("geometries") or {}).get("features") or []
         polys = []
         for f in feats:

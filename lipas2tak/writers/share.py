@@ -35,8 +35,9 @@ TEXT = {
         "step1_text": "Without it the markers show default icons.",
         "step2": "2. All areas as auto-refreshing layers",
         "step2_text": "Scan the QR code or tap the button on the phone: ATAK adds an auto-refreshing link "
-                      "(Overlay Manager → Network Resources), refreshed daily. National parks are on by default "
-                      "and regions off (they contain the parks too); switch regions on one by one. Other apps: "
+                      "(Overlay Manager → Network Resources), refreshed daily. National parks, wilderness areas and "
+                      "state hiking areas are on by default and regions off (they contain the same sites too); "
+                      "switch regions on one by one. Other apps: "
                       "download the .kml file or copy its URL.",
         "add_link": "Add to ATAK",
         "layer": "Auto-refreshing layer",
@@ -77,7 +78,8 @@ TEXT = {
         "step2": "2. Kaikki alueet päivittyvinä tasoina",
         "step2_text": "Skannaa QR-koodi tai paina painiketta puhelimella: ATAK lisää päivittyvän linkin "
                       "(Overlay Manager → Network Resources), joka päivittyy kerran vuorokaudessa. "
-                      "Kansallispuistot ovat oletuksena päällä ja maakunnat pois (ne sisältävät myös puistot); "
+                      "Kansallispuistot, erämaa-alueet ja valtion retkeilyalueet ovat oletuksena päällä ja maakunnat "
+                      "pois (niissä ovat samat kohteet); "
                       "ota maakunnat käyttöön yksitellen. Muut sovellukset: lataa .kml-tiedosto tai kopioi osoite.",
         "add_link": "Lisää ATAKiin",
         "layer": "Päivittyvä taso",
@@ -284,7 +286,9 @@ def write_share_pages(out_root: Path, index: dict, category_titles: dict[str, di
         d = out_root / "share" / lang
         d.mkdir(parents=True, exist_ok=True)
         entries = [e for e in index["areas"] if e["lang"] == lang]
-        categories = sorted({e["category"] for e in entries})
+        # category_titles is in display order (config.yaml)
+        present = {e["category"] for e in entries}
+        categories = [c for c in category_titles if c in present] + sorted(present - set(category_titles))
         links = (index.get("links") or {}).get(lang, {})
         link_pkgs = (index.get("link_packages") or {}).get(lang, {})
         other_lang, other_label = t["lang_other"]

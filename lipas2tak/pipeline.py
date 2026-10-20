@@ -391,7 +391,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     }
     if (settings.get("outputs") or {}).get("share_pages", True):
         titles = {c: {lang: _category_title(settings, c, lang) for lang in settings.languages}
-                  for c in {e["category"] for e in index_areas}}
+                  for c in sorted({e["category"] for e in index_areas}, key=category_sort_key(settings))}
         index["share"] = share.write_share_pages(staging, index, titles, settings.languages)
     # When the sources were last checked. Kept in its own small file so that the
     # pages stay byte-identical when nothing changed (they read it with JavaScript).
@@ -426,6 +426,12 @@ def _category_title(settings: Settings, category: str, lang: str) -> str:
 
 
 ROUTE_CATEGORY = "reitit"
+
+
+def category_sort_key(settings: Settings):
+    """Categories in the order of config.yaml `areas`, route types last."""
+    order = [*(settings.get("areas") or {}), ROUTE_CATEGORY]
+    return lambda c: (order.index(c) if c in order else len(order), c)
 
 
 def route_type_areas(settings: Settings, feats: list[Feature]
@@ -482,7 +488,8 @@ def write_link_collections(settings: Settings, entries: list[dict], out_root: Pa
     packages: dict[str, dict[str, str]] = {}
     for lang in settings.languages:
         sections = []
-        for category in sorted({e["category"] for e in entries if e["lang"] == lang}):
+        for category in sorted({e["category"] for e in entries if e["lang"] == lang},
+                               key=category_sort_key(settings)):
             items = sorted((e for e in entries if e["lang"] == lang and e["category"] == category
                             and "kmz" in e["files"]), key=lambda e: (e.get("order", 0), e["name"]))
             if not items:

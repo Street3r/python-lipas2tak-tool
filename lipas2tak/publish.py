@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -29,6 +30,9 @@ log = logging.getLogger(__name__)
 # Files whose content changes on every run; a change in these alone is not published
 VOLATILE = {"index.json", "index.html", "status.json", "CHANGELOG.md"}
 CHANGELOG_KEEP = 52
+# A build with more than this share fewer features than the published version is
+# not published (e.g. a source returned incomplete data). Override: allow_shrink.
+MAX_SHRINK = float(os.environ.get("PUBLISH_MAX_SHRINK", "0.10"))
 
 BRANCH_README = """# {repo_name} – generated data
 
@@ -153,6 +157,12 @@ def _changelog(old: str, now: datetime, changes: dict, n_features: int) -> str:
     return "# Changelog\n\nLatest updates of the generated data.\n\n" + "\n".join([entry, *kept])
 
 
+def _published_features(changelog: str) -> Optional[int]:
+    """Feature count of the published version (latest changelog entry), or None."""
+    m = re.search(r"^(\d+) features\.$", changelog, re.M)
+    return int(m.group(1)) if m else None
+
+
 def publish(settings: Settings, raw_dir: Path, workdir: Path, *args, dry_run: bool = False, **kw) -> str:
     """Build the public version and push it if anything changed. Returns a status string.
 
@@ -165,7 +175,7 @@ def publish(settings: Settings, raw_dir: Path, workdir: Path, *args, dry_run: bo
     ok = False
     try:
         result = _publish(settings, raw_dir, workdir, *args, dry_run=dry_run, **kw)
-        ok = not dry_run
+        ok = not dry_run and not result.startswith("blocked")
         return result
     finally:
         if not ok:
@@ -177,7 +187,8 @@ def publish(settings: Settings, raw_dir: Path, workdir: Path, *args, dry_run: bo
 
 def _publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, branch: str, base_url: str,
              repo_name: str = "finland-outdoor-tak-data", dry_run: bool = False,
-             now: Optional[datetime] = None, source_status: Optional[Path] = None) -> str:
+             now: Optional[datetime] = None, source_status: Optional[Path] = None,
+             allow_shrink: bool = False) -> str:
     now = now or datetime.now(timezone.utc)
     workdir.mkdir(parents=True, exist_ok=True)
     pub = public_settings(settings, workdir, base_url)
@@ -193,6 +204,9 @@ def _publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, br
     repo = workdir / "repo"
     _prepare_repo(repo, repo_url, branch)
     old_changelog = (repo / "CHANGELOG.md").read_text(encoding="utf-8") if (repo / "CHANGELOG.md").exists() else ""
+    before = _published_features(old_changelog)
+    if before and not allow_shrink and res["features"] < before * (1 - MAX_SHRINK):
+        return _block(repo, branch, now, res["features"], before, dry_run)
     _sync_tree(out, repo)
     (repo / ".nojekyll").write_text("", encoding="utf-8")
     (repo / "README.md").write_text(BRANCH_README.format(
@@ -224,11 +238,7 @@ def _publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, br
     if dry_run:
         log.info("Publish (dry run): %s, not pushed", msg)
         return f"dry-run: {len(real)} files"
-    ident = {
-        "GIT_AUTHOR_NAME": os.environ.get("PUBLISH_GIT_NAME", "lipas2tak publisher"),
-        "GIT_AUTHOR_EMAIL": os.environ.get("PUBLISH_GIT_EMAIL", "lipas2tak@users.noreply.github.com"),
-    }
-    ident["GIT_COMMITTER_NAME"], ident["GIT_COMMITTER_EMAIL"] = ident["GIT_AUTHOR_NAME"], ident["GIT_AUTHOR_EMAIL"]
+    ident = _ident()
     tree = _git(repo, "write-tree", capture=True)
     commit = _git(repo, "commit-tree", tree, "-m", msg, capture=True, env=ident)
     try:
@@ -244,6 +254,41 @@ def _publish(settings: Settings, raw_dir: Path, workdir: Path, repo_url: str, br
     _git(repo, "reset", "-q", "--hard", commit)
     log.info("Published %s to %s: %s", commit[:8], branch, msg)
     return f"published: {len(real)} files" if real else "checked: no changes"
+
+
+def _ident() -> dict:
+    ident = {
+        "GIT_AUTHOR_NAME": os.environ.get("PUBLISH_GIT_NAME", "lipas2tak publisher"),
+        "GIT_AUTHOR_EMAIL": os.environ.get("PUBLISH_GIT_EMAIL", "lipas2tak@users.noreply.github.com"),
+    }
+    ident["GIT_COMMITTER_NAME"], ident["GIT_COMMITTER_EMAIL"] = ident["GIT_AUTHOR_NAME"], ident["GIT_AUTHOR_EMAIL"]
+    return ident
+
+
+def _block(repo: Path, branch: str, now: datetime, features: int, before: int, dry_run: bool) -> str:
+    """Keep the published data and only flag the blocked update in status.json.
+
+    The check time is left as it was, so the pages still show when the data was
+    last verified; the Stale data workflow in the data repository opens an issue
+    when it sees the flag.
+    """
+    log.error("Publish blocked: %d features, %d published (more than %.0f%% fewer). "
+              "Check the generator log; to publish anyway run `lipas2tak publish --allow-shrink`.",
+              features, before, MAX_SHRINK * 100)
+    status_path = repo / "status.json"
+    status = json.loads(status_path.read_text(encoding="utf-8")) if status_path.exists() else {}
+    status["publish_blocked"] = {"at": now.isoformat(timespec="seconds"), "features": features,
+                                 "published_features": before}
+    status_path.write_text(json.dumps(status), encoding="utf-8")
+    if dry_run:
+        return f"blocked (dry run): {features} features, {before} published"
+    _git(repo, "add", "status.json")
+    tree = _git(repo, "write-tree", capture=True)
+    commit = _git(repo, "commit-tree", tree, "-m", f"Update blocked {now.strftime('%Y-%m-%d')}: "
+                  f"{features} features, {before} published", capture=True, env=_ident())
+    _git(repo, "push", "-q", "--force", "origin", f"{commit}:refs/heads/{branch}")
+    _git(repo, "reset", "-q", "--hard", commit)
+    return f"blocked: {features} features, {before} published"
 
 
 def watch(settings: Settings, source_index: Path, interval_s: float, **kw) -> None:

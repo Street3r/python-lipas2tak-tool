@@ -6,7 +6,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import requests
 
@@ -35,19 +35,25 @@ class CachedClient:
         h = hashlib.sha256(json.dumps([method, url, params, data], sort_keys=True, default=str).encode()).hexdigest()
         return self.cache_dir / f"{h[:32]}.json"
 
-    def cached(self, url: str, params: Any = None, *, method: str = "GET", data: Any = None) -> Any:
+    def cached(self, url: str, params: Any = None, *, method: str = "GET", data: Any = None,
+               quiet: bool = False) -> Any:
         """Last cached response regardless of age, or None (no network request)."""
         path = self._key(method, url, params, data)
         if not path.exists():
             return None
-        age_h = (time.time() - path.stat().st_mtime) / 3600
-        log.warning("Using cached copy of %s from %.0f h ago", url, age_h)
+        if not quiet:
+            age_h = (time.time() - path.stat().st_mtime) / 3600
+            log.warning("Using cached copy of %s from %.0f h ago", url, age_h)
         return json.loads(path.read_text(encoding="utf-8"))
 
     def get_json(self, url: str, params: Any = None, *, method: str = "GET", data: Any = None,
                  use_cache: bool = True, retries: int | None = None, timeout_s: float | None = None,
-                 stale_ok: bool = False) -> Any:
-        """Fetch JSON. With stale_ok, an expired cached copy is returned if every attempt fails."""
+                 stale_ok: bool = False, validate: Callable[[Any], None] | None = None) -> Any:
+        """Fetch JSON. With stale_ok, an expired cached copy is returned if every attempt fails.
+
+        validate is called with each response before it is cached; raising ValueError
+        rejects the response (it is retried and never overwrites a good cached copy).
+        """
         path = self._key(method, url, params, data)
         if use_cache and path.exists() and time.time() - path.stat().st_mtime < self.max_age_s:
             return json.loads(path.read_text(encoding="utf-8"))
@@ -67,6 +73,8 @@ class CachedClient:
                     raise requests.HTTPError(f"{r.status_code}", response=r)
                 r.raise_for_status()
                 payload = r.json()
+                if validate:
+                    validate(payload)
                 path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
                 return payload
             except (requests.RequestException, ValueError) as e:

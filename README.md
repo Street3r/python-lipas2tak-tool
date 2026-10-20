@@ -31,7 +31,7 @@ lipas2tak run                      # fetch everything and write data/output/
 lipas2tak run --only nuuksio       # a single area (slug or key, e.g. kansallispuistot/nuuksio)
 lipas2tak fetch --dump data/raw    # save the raw data
 lipas2tak build --raw data/raw     # build from saved raw data without network access
-lipas2tak schedule --every-days 7  # container mode: run now and then weekly
+lipas2tak schedule --at "mon 04:00"  # container mode: weekly at a fixed time (--tz, default Europe/Helsinki)
 lipas2tak publish --raw data/raw --repo <git url> --base-url <public url>   # public build to a git branch
 ```
 
@@ -46,7 +46,11 @@ Prebuilt image: `ghcr.io/street3r/python-lipas2tak-tool` (tags `main`, versions 
 
 Tests: `python -m unittest discover -s tests`
 
-Coverage check: `python -m lipas2tak.coverage data/raw eramaat` lists the raw Lipas sites, LOIs and OSM elements inside each area of the given categories that are not in the area's package, with the reason (duplicate, test data, route layer only, route mostly outside the area).
+Scheduling: with `--at` (env `LIPAS2TAK_SCHEDULE_AT`; time zone `--tz` / `LIPAS2TAK_TZ`) the run happens weekly at that local time. On start it runs at once only if the previous scheduled run was missed (or with `--run-now`), so restarts and updates do not move the schedule. Without `--at`, `--every-days N` runs at start and then every N days.
+
+Coverage check: `python -m lipas2tak.coverage data/raw eramaat` lists the raw Lipas sites, LOIs and OSM elements inside each area of the given categories (or single areas, e.g. `kansallispuistot/petkeljarvi`) that are not in the area's package, with the reason (duplicate, test data, route layer only, route mostly outside the area).
+
+Quality checks: every build lists areas without features, area names missing from `config/area_names.yaml` and files over `quality.max_file_mb` in the log and in `status.json` (`warnings`); the data repository's Stale data workflow opens an issue for them.
 
 ### Configuration
 

@@ -21,7 +21,8 @@ RUN useradd --system --uid 10001 lipas && mkdir -p /data && chown lipas /data
 USER lipas
 VOLUME ["/data"]
 
-# Default: run immediately and then every 7 days. One-off run:
+# Default: weekly on Monday 04:00 Finnish time (runs at start only if a scheduled
+# run was missed). One-off run:
 #   docker run --rm -v ./data:/data IMAGE run
 ENTRYPOINT ["lipas2tak", "--config", "/app/config/config.yaml", "--types", "/app/config/types.yaml"]
-CMD ["schedule", "--every-days", "7"]
+CMD ["schedule", "--at", "mon 04:00"]

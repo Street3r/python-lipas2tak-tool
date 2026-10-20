@@ -9,6 +9,7 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from . import __version__, normalize, pipeline
 from .config import load_settings
@@ -62,21 +63,86 @@ def cmd_publish(args) -> int:
     return 0
 
 
+WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def parse_at(spec: str) -> tuple[int, int, int]:
+    """'mon 04:00' -> (weekday 0-6, hour, minute)."""
+    try:
+        day, hm = spec.lower().split()
+        hour, minute = (int(x) for x in hm.split(":"))
+        if not (0 <= hour < 24 and 0 <= minute < 60):
+            raise ValueError
+        return WEEKDAYS.index(day[:3]), hour, minute
+    except ValueError:
+        raise SystemExit(f"--at: expected e.g. 'mon 04:00', got {spec!r}")
+
+
+def next_slot(after: datetime, at: tuple[int, int, int], tz: ZoneInfo) -> datetime:
+    """First weekly slot (local time in `tz`) strictly after `after`, in UTC."""
+    weekday, hour, minute = at
+    local = after.astimezone(tz)
+    day = local.date() + timedelta(days=(weekday - local.weekday()) % 7)
+    for _ in range(3):
+        slot = datetime(day.year, day.month, day.day, hour, minute, tzinfo=tz)
+        if slot > after:
+            return slot.astimezone(timezone.utc)
+        day += timedelta(days=7)
+    raise AssertionError("unreachable")
+
+
+def _last_run(args) -> datetime | None:
+    """Time of the previous run (output index.json), or None."""
+    try:
+        idx = _settings(args).path("output") / "index.json"
+        return datetime.fromisoformat(json.loads(idx.read_text(encoding="utf-8"))["generated"])
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def cmd_schedule(args) -> int:
-    """Simple scheduler for containers: run now and then every N days."""
+    """Scheduler for containers.
+
+    With --at (e.g. 'mon 04:00', local time in --tz) the run happens weekly at
+    that time; on start it runs at once only if the previous scheduled run was
+    missed (or with --run-now), so restarts and updates do not move the schedule.
+    Without --at: run now and then every N days.
+    """
     log = logging.getLogger("schedule")
-    interval = timedelta(days=args.every_days)
+    if not args.at:
+        interval = timedelta(days=args.every_days)
+        while True:
+            start = datetime.now(timezone.utc)
+            try:
+                cmd_run(args, next_check=start + interval)
+            except Exception:  # pragma: no cover - the scheduler keeps going after errors
+                log.exception("Run failed; retrying in 6 h")
+                time.sleep(6 * 3600)
+                continue
+            nxt = start + interval
+            log.info("Next run %s", nxt.isoformat())
+            time.sleep(max(60.0, (nxt - datetime.now(timezone.utc)).total_seconds()))
+
+    at, tz = parse_at(args.at), ZoneInfo(args.tz)
+    now = datetime.now(timezone.utc)
+    last = _last_run(args)
+    due = args.run_now or last is None or next_slot(last, at, tz) <= now
+    if not due:
+        log.info("Previous run %s is up to date; waiting for the schedule (%s %s)",
+                 last.isoformat(timespec="seconds"), args.at, args.tz)
     while True:
-        start = datetime.now(timezone.utc)
-        try:
-            cmd_run(args, next_check=start + interval)
-        except Exception:  # pragma: no cover - the scheduler keeps going after errors
-            log.exception("Run failed; retrying in 6 h")
-            time.sleep(6 * 3600)
-            continue
-        nxt = start + interval
-        log.info("Next run %s", nxt.isoformat())
+        if due:
+            try:
+                cmd_run(args, next_check=next_slot(datetime.now(timezone.utc), at, tz))
+            except Exception:  # pragma: no cover - the scheduler keeps going after errors
+                log.exception("Run failed; retrying in 6 h")
+                nxt = next_slot(datetime.now(timezone.utc), at, tz)
+                time.sleep(max(60.0, min(6 * 3600, (nxt - datetime.now(timezone.utc)).total_seconds())))
+                continue
+        nxt = next_slot(datetime.now(timezone.utc), at, tz)
+        log.info("Next run %s", nxt.astimezone(tz).isoformat(timespec="minutes"))
         time.sleep(max(60.0, (nxt - datetime.now(timezone.utc)).total_seconds()))
+        due = True
 
 
 def _summary(res: dict) -> None:
@@ -87,6 +153,10 @@ def _summary(res: dict) -> None:
         print(f"  [{e['lang']}] {e['key']}: {total} features -> {', '.join(sorted(e['files']))}")
     for lang, links in (idx.get("links") or {}).items():
         print(f"  KML network links [{lang}]: {', '.join(sorted(links.values()))}")
+    if res.get("warnings"):
+        print("Quality warnings:")
+        for w in res["warnings"]:
+            print(f"  {w}")
     if res["changes"]:
         print("Changes since the previous run:")
         for k, v in res["changes"].items():
@@ -116,7 +186,12 @@ def main(argv=None) -> int:
     r.set_defaults(func=cmd_run)
 
     sc = sub.add_parser("schedule", help="run repeatedly (container use)")
-    sc.add_argument("--every-days", type=float, default=7)
+    sc.add_argument("--every-days", type=float, default=7, help="interval when --at is not given")
+    sc.add_argument("--at", default=os.environ.get("LIPAS2TAK_SCHEDULE_AT", ""),
+                    help="fixed weekly time, e.g. 'mon 04:00' (env LIPAS2TAK_SCHEDULE_AT)")
+    sc.add_argument("--tz", default=os.environ.get("LIPAS2TAK_TZ", "Europe/Helsinki"),
+                    help="time zone of --at (env LIPAS2TAK_TZ, default Europe/Helsinki)")
+    sc.add_argument("--run-now", action="store_true", help="with --at: also run once at start")
     sc.add_argument("--only", nargs="*")
     sc.add_argument("--dump")
     sc.set_defaults(func=cmd_schedule)

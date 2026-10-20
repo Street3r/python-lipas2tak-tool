@@ -297,6 +297,22 @@ class PipelineTests(unittest.TestCase):
         order = [nav.index(t) for t in ("Kansallispuistot", "Erämaa-alueet", "Valtion retkeilyalueet", "Maakunnat")]
         self.assertEqual(order, sorted(order))
 
+    def test_quality_warnings(self):
+        far = [[[29.0, 69.0], [29.01, 69.0], [29.01, 69.01], [29.0, 69.0]]]
+        self.raw.area_sites["eramaat"].append({
+            "lipas-id": 999001, "name": "Uudenkylän erämaa-alue",
+            "location": {"geometries": {"features": [{"geometry": {"type": "Polygon", "coordinates": far}}]}}})
+        self.settings.raw["quality"] = {"max_file_mb": 0.001}
+        res = self.run_once()
+        w = res["warnings"]
+        self.assertIn("eramaat/uudenkyla: base form of 'Uudenkylän erämaa-alue' guessed; "
+                      "add it to config/area_names.yaml", w)
+        self.assertIn("eramaat/uudenkyla: no features, no package", w)
+        self.assertTrue(any(x.startswith("fi/kansallispuistot/nuuksio/") and "MB (limit" in x for x in w))
+        self.assertFalse(any(x.startswith("eramaat/kasivarsi") for x in w))   # in area_names.yaml, has features
+        status = json.loads((self.tmp / "out" / "status.json").read_text())
+        self.assertEqual(status["warnings"], w)
+
     def test_area_english_names(self):
         from lipas2tak import areas
         sq = [[24.4, 60.2], [24.5, 60.2], [24.5, 60.3], [24.4, 60.2]]
@@ -520,6 +536,25 @@ class PipelineTests(unittest.TestCase):
         out = self.tmp / "out"
         with zipfile.ZipFile(out / "fi/kansallispuistot/nuuksio/nuuksio_fi.zip") as z:
             self.assertFalse(any(n.startswith("lipas-900002/") for n in z.namelist()))
+
+
+class ScheduleTests(unittest.TestCase):
+    def test_next_slot(self):
+        from zoneinfo import ZoneInfo
+        from lipas2tak.cli import next_slot, parse_at
+        tz, at = ZoneInfo("Europe/Helsinki"), parse_at("mon 04:00")
+        self.assertEqual(at, (0, 4, 0))
+        utc = timezone.utc
+        # Tue 20.10.2026 -> Mon 26.10. 04:00 EET (winter time: UTC+2)
+        self.assertEqual(next_slot(datetime(2026, 10, 20, 20, 0, tzinfo=utc), at, tz),
+                         datetime(2026, 10, 26, 2, 0, tzinfo=utc))
+        # Summer time (UTC+3); exactly at the slot -> the next week
+        self.assertEqual(next_slot(datetime(2026, 6, 1, 1, 0, tzinfo=utc), at, tz),
+                         datetime(2026, 6, 8, 1, 0, tzinfo=utc))
+        self.assertEqual(next_slot(datetime(2026, 6, 1, 0, 59, tzinfo=utc), at, tz),
+                         datetime(2026, 6, 1, 1, 0, tzinfo=utc))
+        with self.assertRaises(SystemExit):
+            parse_at("monday 25:00")
 
 
 if __name__ == "__main__":

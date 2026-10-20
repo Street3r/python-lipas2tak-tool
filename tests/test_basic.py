@@ -297,6 +297,31 @@ class PipelineTests(unittest.TestCase):
         order = [nav.index(t) for t in ("Kansallispuistot", "Erämaa-alueet", "Valtion retkeilyalueet", "Maakunnat")]
         self.assertEqual(order, sorted(order))
 
+    def test_osm_only_in_areas(self):
+        import copy
+        from lipas2tak.sources import osm
+        lean_to = copy.deepcopy(next(x for x in self.raw.sites if x["lipas-id"] == 900009))
+        lean_to["lipas-id"] = 900099
+        lean_to["location"]["geometries"]["features"][0]["geometry"]["coordinates"] = [24.7, 61.2]
+        self.raw.sites.append(lean_to)
+        self.raw.osm["pysakointi"] = [
+            {"type": "way", "id": 7001, "center": {"lat": 60.5005, "lon": 25.5005}, "tags": {"amenity": "parking"}},
+            # next to a lean-to but outside every protected area: left out
+            {"type": "node", "id": 7002, "lat": 61.2001, "lon": 24.7002, "tags": {"amenity": "parking"}},
+        ]
+        self.run_once()
+        idx = json.loads((self.tmp / "out" / "index.json").read_text())
+        uids = {u for e in idx["areas"] for u in e["uids"]}
+        self.assertIn("osm-w7001", uids)
+        self.assertIn("lipas-900099", uids)
+        self.assertNotIn("osm-n7002", uids)
+        boxes = pipeline.area_bboxes(self.settings, self.raw)
+        self.assertEqual(len(boxes), sum(1 for c in self.raw.area_sites.values() for s in c) - 1)  # Koiraharju
+        s, w, n, e = next(b for b in boxes if b[0] < 60.5 < b[2] and b[1] < 25.5 < b[3])
+        q = osm.build_query({"amenity": "parking"}, boxes)
+        self.assertIn(f'way["amenity"="parking"]({s:.4f},{w:.4f},{n:.4f},{e:.4f});', q)
+        self.assertNotIn("area.fi", q)
+
     def test_quality_warnings(self):
         far = [[[29.0, 69.0], [29.01, 69.0], [29.01, 69.01], [29.0, 69.0]]]
         self.raw.area_sites["eramaat"].append({

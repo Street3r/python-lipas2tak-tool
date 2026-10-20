@@ -5,6 +5,7 @@ import copy
 import hashlib
 import json
 import logging
+import math
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -64,10 +65,14 @@ def fetch_raw(settings: Settings, clf: normalize.Classifier) -> RawData:
         raw.lois = list(api.lois(clf.loi_types(), lc.get("statuses")))
     oc = settings.get("sources", "osm") or {}
     if oc.get("enabled"):
+        bboxes = area_bboxes(settings, raw)
         for kind, tags in clf.osm_queries():
+            only_in_areas = clf.osm_source(kind).get("only_in_areas")
+            if only_in_areas and not bboxes:
+                continue
             try:
                 urls = [oc["overpass_url"], *(oc.get("overpass_fallback_urls") or [])]
-                els = osm.fetch(client, urls, tags)
+                els = osm.fetch(client, urls, tags, bboxes if only_in_areas else None)
             except Exception as e:  # OSM is a supplementary source: errors do not abort the run
                 log.error("OSM query failed (%s %s): %s", kind, tags, e)
                 continue
@@ -80,6 +85,21 @@ def fetch_raw(settings: Settings, clf: normalize.Classifier) -> RawData:
             "outputFormat": "application/json", "srsName": "EPSG:4326"})
         raw.regions = data.get("features", [])
     return raw
+
+
+def area_bboxes(settings: Settings, raw: RawData) -> list[tuple[float, float, float, float]]:
+    """Bounding boxes (south, west, north, east) of the protected areas, with their buffer."""
+    out = []
+    for cat, sites in raw.area_sites.items():
+        for a in areas_mod.areas_from_lipas_sites(sites, cat, settings.get("areas", cat),
+                                                  settings.area_names.get(cat)):
+            pts = [c for poly in a.geometry["coordinates"] for ring in poly for c in ring]
+            lat = [p[1] for p in pts]
+            dlat = a.buffer_m / 111_000
+            dlon = dlat / max(0.1, math.cos(math.radians(max(lat))))
+            out.append((min(lat) - dlat, min(p[0] for p in pts) - dlon,
+                        max(lat) + dlat, max(p[0] for p in pts) + dlon))
+    return sorted(out)
 
 
 # --- Enrichment ---------------------------------------------------------------
@@ -124,7 +144,9 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
         src = clf.osm_source(kind)
         kept = normalize.dedupe_osm(
             cand, feats,
-            context_radius_m=src.get("context_radius_m", oc.get("context_radius_m", 300)),
+            # only_in_areas: e.g. parking, which is everywhere near routes in towns
+            context_radius_m=0 if src.get("only_in_areas") else
+            src.get("context_radius_m", oc.get("context_radius_m", 300)),
             dedupe_radius_m=src.get("dedupe_radius_m", oc.get("dedupe_radius_m", 40)),
             group_of=clf.group_of, in_area=in_area)
         log.info("OSM %s: %d/%d included", kind, len(kept), len(cand))

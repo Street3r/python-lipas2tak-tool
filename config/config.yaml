@@ -65,6 +65,7 @@ areas:
     buffer_m: 500
     strip_from_name: "(?i)\\s*erämaa(-alue)?$"
     exclude_lipas_ids: [616785]   # "Koiraharju": active in type 110 but not a wilderness area (2026-10)
+    name_en: "{name} Wilderness Area"   # used when Lipas has no English name ({name} = short name)
   valtion_retkeilyalueet:
     enabled: true
     lipas_type_codes: [109]   # Lipas "Valtion retkeilyalue" (checked 2026-10)
@@ -72,6 +73,7 @@ areas:
     title: {fi: Valtion retkeilyalueet, en: State hiking areas}
     buffer_m: 500
     strip_from_name: "(?i)\\s*(valtion\\s+)?retkeilyalue$"
+    name_en: "{name} Hiking Area"
   maakunnat:
     enabled: true
     title: {fi: Maakunnat, en: Regions}

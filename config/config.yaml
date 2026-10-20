@@ -57,6 +57,13 @@ areas:
     title: {fi: Kansallispuistot, en: National parks}
     buffer_m: 500          # include parking and info points at the edge
     strip_from_name: "(?i)\\s*kansallispuisto$"
+    name_en: "{name} National Park"   # used when Lipas has no English name ({name} = short name)
+    name_en_overrides:                # official English names that are not "<short name> National Park"
+      Itäinen Suomenlahti: Eastern Gulf of Finland National Park
+      Perämeri: Bothnian Bay National Park
+      Saaristomeri: Archipelago National Park
+      Selkämeri: Bothnian Sea National Park
+      Tammisaaren saaristo: Ekenäs Archipelago National Park
   eramaat:
     enabled: true
     lipas_type_codes: [110]   # Lipas "Erämaa-alue" (checked 2026-10)

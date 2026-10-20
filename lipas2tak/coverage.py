@@ -5,7 +5,8 @@ runs the same normalisation as a build and, for every area of the given
 categories, lists the Lipas sites, LOIs and OSM elements located inside the
 area (with its buffer) that did not end up in the area's data package.
 
-Run: python -m lipas2tak.coverage /data/raw [category ...]
+Run: python -m lipas2tak.coverage /data/raw [category or area ...]
+     e.g. kansallispuistot, or kansallispuistot/petkeljarvi
      (default categories: eramaat valtion_retkeilyalueet)
 """
 from __future__ import annotations
@@ -97,7 +98,8 @@ def report(raw_dir: Path, categories: list[str]) -> str:
 
     lines = []
     totals: Counter = Counter()
-    for area in sorted((a for a in areas.values() if a.category in categories), key=lambda a: a.key):
+    for area in sorted((a for a in areas.values() if a.category in categories or a.key in categories),
+                       key=lambda a: a.key):
         shape = geo.Area(area.geometry)
         missing = []
         included = 0

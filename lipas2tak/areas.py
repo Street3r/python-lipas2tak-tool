@@ -47,6 +47,9 @@ def areas_from_lipas_sites(sites: list[dict], category: str, cfg: dict,
             continue
         full = s.get("name") or str(s["lipas-id"])
         short = short_name(full, strip, names)
+        nfc = unicodedata.normalize("NFC", full)
+        stem = strip.sub("", nfc).strip()
+        guessed = bool(stem) and stem != nfc and stem not in {unicodedata.normalize("NFC", k) for k in names}
         en = ((s.get("name-localized") or {}).get("en")
               or (cfg.get("name_en_overrides") or {}).get(short)
               or (cfg["name_en"].format(name=short) if cfg.get("name_en") else full))
@@ -57,6 +60,7 @@ def areas_from_lipas_sites(sites: list[dict], category: str, cfg: dict,
             tag=slugify(short),
             geometry={"type": "MultiPolygon", "coordinates": polys},
             buffer_m=float(cfg.get("buffer_m", 0)),
+            name_guessed=guessed,
         ))
     return out
 

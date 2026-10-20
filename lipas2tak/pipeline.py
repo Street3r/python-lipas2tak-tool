@@ -354,7 +354,11 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     state_path = settings.path("cache") / "state.json"
     times = _load_state(state_path).get("since", {})
     index_areas = []
+    warnings: list[str] = []
     targets = [a for a in all_areas.values() if not only or a.key in only or a.slug in only]
+    for area in sorted(targets, key=lambda a: a.key):
+        if area.name_guessed:
+            warnings.append(f"{area.key}: base form of '{area.name.fi}' guessed; add it to config/area_names.yaml")
     in_packages = [f for f in feats if settings.kinds[f.kind].area_packages]
     for area in sorted(targets, key=lambda a: (a.category, a.slug)):
         if area.category == "maakunnat":
@@ -363,6 +367,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
             sel = [f for f in in_packages if area.key in f.areas]
         if not sel:
             log.info("%s: no features, skipped", area.key)
+            warnings.append(f"{area.key}: no features, no package")
             continue
         index_areas.extend(write_area(settings, area, sel, all_areas, staging, now, times))
     route_outs = settings.get("route_types", "outputs", default=None) or {}
@@ -393,11 +398,20 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         titles = {c: {lang: _category_title(settings, c, lang) for lang in settings.languages}
                   for c in sorted({e["category"] for e in index_areas}, key=category_sort_key(settings))}
         index["share"] = share.write_share_pages(staging, index, titles, settings.languages)
+    max_mb = float(settings.get("quality", "max_file_mb", default=50))
+    for p in sorted(staging.rglob("*")):
+        if p.is_file() and p.stat().st_size > max_mb * 1e6:
+            warnings.append(f"{p.relative_to(staging).as_posix()}: {p.stat().st_size / 1e6:.1f} MB "
+                            f"(limit {max_mb:g} MB; GitHub rejects files over 100 MB)")
+    for w in warnings:
+        log.warning("Quality: %s", w)
     # When the sources were last checked. Kept in its own small file so that the
     # pages stay byte-identical when nothing changed (they read it with JavaScript).
     status = {"checked": now.isoformat(timespec="seconds")}
     if next_check:
         status["next_check"] = next_check.isoformat(timespec="seconds")
+    if warnings:   # the Stale data workflow of the data repository opens an issue for these
+        status["warnings"] = warnings
     (staging / "status.json").write_text(json.dumps(status), encoding="utf-8")
     index["next_check"] = status.get("next_check", "")
     (staging / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -414,7 +428,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     if old.exists():
         shutil.rmtree(old)
     log.info("Done: %d areas, %d features", len({e['key'] for e in index_areas}), len(feats))
-    return {"index": index, "changes": changes, "features": len(feats)}
+    return {"index": index, "changes": changes, "features": len(feats), "warnings": warnings}
 
 
 def _category_title(settings: Settings, category: str, lang: str) -> str:

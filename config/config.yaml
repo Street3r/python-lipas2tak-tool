@@ -168,3 +168,10 @@ outputs:
   datapackage_on_receive_delete: false
   share_pages: true          # share/<lang>/*.html with QR codes (needs public_base_url)
   network_link_refresh_s: 86400
+
+# Quality checks of a build. Findings are logged, written to status.json
+# ("warnings") and turned into an issue by the data repository's Stale data
+# workflow: areas without features, area names missing from area_names.yaml,
+# files larger than this.
+quality:
+  max_file_mb: 50

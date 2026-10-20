@@ -80,6 +80,7 @@ class AreaDef:
     tag: str             # hashtag without #
     geometry: dict
     buffer_m: float = 0.0
+    name_guessed: bool = False   # base form not in config/area_names.yaml
 
     @property
     def key(self) -> str:

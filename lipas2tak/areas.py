@@ -48,6 +48,7 @@ def areas_from_lipas_sites(sites: list[dict], category: str, cfg: dict,
         full = s.get("name") or str(s["lipas-id"])
         short = short_name(full, strip, names)
         en = ((s.get("name-localized") or {}).get("en")
+              or (cfg.get("name_en_overrides") or {}).get(short)
               or (cfg["name_en"].format(name=short) if cfg.get("name_en") else full))
         out.append(AreaDef(
             slug=file_slug(short),

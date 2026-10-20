@@ -52,7 +52,7 @@ Coverage check: `python -m lipas2tak.coverage data/raw eramaat` lists the raw Li
 
 - `config/config.yaml`: sources, areas, outputs, public URL. Environment overrides: `LIPAS2TAK_PUBLIC_BASE_URL`, `LIPAS2TAK_OUTPUT_DIR`, `LIPAS2TAK_CACHE_DIR`, `LIPAS2TAK_ICONS_DIR`, `LIPAS2TAK_OVERPASS_URL`, `LIPAS2TAK_CONFIG`, `LIPAS2TAK_TYPES`.
 - `config/types.yaml`: feature kinds (Lipas type codes, LOI types, OSM tags), icons, colours and hashtags. Adding a kind needs no code changes.
-- `config/area_names.yaml`: base-form area names (e.g. "Nuuksion" → "Nuuksio"). An area category's `name_en` (e.g. `"{name} Wilderness Area"`) gives English names when Lipas has none.
+- `config/area_names.yaml`: base-form area names (e.g. "Nuuksion" → "Nuuksio"). An area category's `name_en` (e.g. `"{name} Wilderness Area"`) gives English names when Lipas has none; `name_en_overrides` sets official names that do not follow the pattern (e.g. Saaristomeri → Archipelago National Park).
 - Icons: see [icons/README.md](icons/README.md).
 
 ### Output layout

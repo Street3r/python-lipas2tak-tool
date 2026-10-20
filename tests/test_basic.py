@@ -297,6 +297,17 @@ class PipelineTests(unittest.TestCase):
         order = [nav.index(t) for t in ("Kansallispuistot", "Erämaa-alueet", "Valtion retkeilyalueet", "Maakunnat")]
         self.assertEqual(order, sorted(order))
 
+    def test_area_english_names(self):
+        from lipas2tak import areas
+        sq = [[24.4, 60.2], [24.5, 60.2], [24.5, 60.3], [24.4, 60.2]]
+        sites = [{"lipas-id": i, "name": n, "location": {"geometries": {"type": "FeatureCollection", "features": [
+            {"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [sq]}}]}}}
+            for i, n in enumerate(["Nuuksion kansallispuisto", "Saaristomeren kansallispuisto"])]
+        defs = areas.areas_from_lipas_sites(sites, "kansallispuistot", self.settings.get("areas", "kansallispuistot"),
+                                            self.settings.area_names.get("kansallispuistot"))
+        self.assertEqual([a.name.en for a in defs], ["Nuuksio National Park", "Archipelago National Park"])
+        self.assertEqual([a.name.fi for a in defs], ["Nuuksion kansallispuisto", "Saaristomeren kansallispuisto"])
+
     def test_coverage_report(self):
         from lipas2tak import coverage
         rep = coverage.report(FIXTURE, ["kansallispuistot"])

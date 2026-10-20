@@ -302,7 +302,7 @@ class PipelineTests(unittest.TestCase):
         rep = coverage.report(FIXTURE, ["kansallispuistot"])
         self.assertIn("Testilaavu | lipas:900008", rep)
         self.assertIn("area_packages false", rep)
-        self.assertIn("osm:node/3001", rep)          # duplicate of the Lipas lean-to
+        self.assertIn("Haukkalammen laavu = Haukkalammen laavu (lipas, ", rep)  # duplicate of the Lipas lean-to
 
     def test_osm_element_in_two_kinds_kept_once(self):
         # Kolmoislammen laavu (kept as laavu) also tagged as a fire pit

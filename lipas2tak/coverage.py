@@ -69,6 +69,22 @@ def raw_items(raw: pipeline.RawData):
             yield ("osm", key, tags.get("name") or "", f"osm {kind}", [pt] if pt else [])
 
 
+def _nearest_same_group(pt, kind: str, feats: list, clf, radius_m: float = 300.0) -> str:
+    """The nearest kept feature of the same group as `kind`: 'name (source, distance m)'."""
+    group = clf.group_of(kind)
+    best = None
+    for f in feats:
+        if f.point is None or clf.group_of(f.kind) != group:
+            continue
+        d = geo.haversine(pt, f.point)
+        if d <= radius_m and (best is None or d < best[0]):
+            best = (d, f)
+    if best is None:
+        return ""
+    d, f = best
+    return f"{f.name.fi or '(no name)'} ({f.source}, {d:.0f} m)"
+
+
 def report(raw_dir: Path, categories: list[str]) -> str:
     settings = load_settings()
     raw = pipeline.RawData.load(raw_dir)
@@ -95,6 +111,9 @@ def report(raw_dir: Path, categories: list[str]) -> str:
             if not fs:
                 if source == "osm":
                     reason = "OSM: duplicate of a nearby Lipas/OSM feature of the same group"
+                    match = _nearest_same_group(coords[0], typ.removeprefix("osm "), feats, clf)
+                    if match:
+                        name = f"{name or '(no name)'} = {match}"
                 elif clf.excluded(name):
                     reason = "excluded by name (test data)"
                 else:

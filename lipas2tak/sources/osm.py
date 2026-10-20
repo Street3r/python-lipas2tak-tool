@@ -21,20 +21,48 @@ def build_query(tags: dict[str, str]) -> str:
     )
 
 
+# A new result with fewer than this share of the previous result's elements is
+# treated as incomplete. OSM data does not shrink by half in a week.
+MIN_RATIO = 0.5
+MIN_PREVIOUS = 20   # below this the previous result is too small to compare with
+
+
+def check_complete(data: dict, min_elements: int = 0) -> None:
+    """Raise ValueError if an Overpass response is incomplete.
+
+    A busy Overpass server can answer HTTP 200 with only part of the elements and
+    a "remark" such as "runtime error: Query timed out ..." or "... out of memory".
+    """
+    remark = str(data.get("remark") or "")
+    if "error" in remark.lower():
+        raise ValueError(f"incomplete Overpass result: {remark}")
+    n = len(data.get("elements", []))
+    if n < min_elements:
+        raise ValueError(f"Overpass returned {n} elements, expected at least {min_elements} "
+                         f"(previous result); treating it as incomplete")
+
+
 def fetch(client: CachedClient, overpass_urls: str | list[str], tags: dict[str, str]) -> list[dict]:
     """Query Overpass; tries each server in turn (public servers are often busy: 504/429).
 
-    If every server fails, the previous cached result is used, so a busy Overpass
-    does not make OSM features disappear from the output.
+    Incomplete results (error remark, or far fewer elements than the previous
+    result) are rejected like failed requests. If every server fails, the previous
+    cached result is used, so a busy Overpass does not make OSM features disappear
+    from the output.
     """
     urls = [overpass_urls] if isinstance(overpass_urls, str) else list(overpass_urls)
     q = build_query(tags)
+    prev = next((d for u in urls if (d := client.cached(u, method="POST", data={"data": q}, quiet=True))
+                 is not None), None)
+    prev_n = len(prev.get("elements", [])) if prev else 0
+    min_elements = int(prev_n * MIN_RATIO) if prev_n >= MIN_PREVIOUS else 0
     last: Exception | None = None
     for i, url in enumerate(urls):
         is_last = i == len(urls) - 1
         try:
             data = client.get_json(url, method="POST", data={"data": q}, retries=4, timeout_s=330,
-                                   stale_ok=False)
+                                   stale_ok=False,
+                                   validate=lambda d: check_complete(d, min_elements))
             break
         except RuntimeError as e:
             last = e

@@ -107,6 +107,39 @@ class FailedPublishTests(PublishTests):
         self.assertEqual(git(self.remote, "branch", "--format=%(refname:short)"), "data")
 
 
+class ShrinkGuardTests(PublishTests):
+    def test_publish_cycle(self):
+        pass
+
+    def test_much_smaller_build_is_not_published(self):
+        publish.publish(self.settings, now=datetime(2026, 10, 8, tzinfo=timezone.utc), **self.kw)
+        before = git(self.remote, "show", "data:index.json")
+        raw = self.tmp / "raw"
+        shutil.copytree(FIXTURE, raw)
+        for name in ("sites.json", "lois.json", "osm.json"):
+            data = json.loads((raw / name).read_text())
+            if isinstance(data, list):
+                data = data[:1]
+            elif isinstance(data, dict):
+                data = {k: (v[:1] if isinstance(v, list) else v) for k, v in data.items()}
+            (raw / name).write_text(json.dumps(data))
+        self.kw["raw_dir"] = raw
+        t2 = datetime(2026, 10, 15, tzinfo=timezone.utc)
+        res = publish.publish(self.settings, now=t2, **self.kw)
+        self.assertTrue(res.startswith("blocked"), res)
+        self.assertEqual(git(self.remote, "show", "data:index.json"), before)     # data kept
+        status = json.loads(git(self.remote, "show", "data:status.json"))
+        self.assertTrue(status["checked"].startswith("2026-10-08"))                # check time kept
+        self.assertTrue(status["publish_blocked"]["at"].startswith("2026-10-15"))
+        self.assertNotIn("## 2026-10-15", git(self.remote, "show", "data:CHANGELOG.md"))
+
+        res = publish.publish(self.settings, now=t2, allow_shrink=True, **self.kw)
+        self.assertTrue(res.startswith("published"), res)
+        status = json.loads(git(self.remote, "show", "data:status.json"))
+        self.assertNotIn("publish_blocked", status)
+        self.assertIn("removed", git(self.remote, "show", "data:CHANGELOG.md"))   # changes kept for the log
+
+
 class BatchUploadTests(PublishTests):
     def test_publish_cycle(self):  # replaced by the test below
         pass

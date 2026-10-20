@@ -53,7 +53,8 @@ def cmd_publish(args) -> int:
         print("Missing: " + ", ".join(missing), file=sys.stderr)
         return 2
     kw = dict(raw_dir=Path(args.raw), workdir=Path(args.workdir), repo_url=args.repo, branch=args.branch,
-              base_url=args.base_url, repo_name=args.repo_name, dry_run=args.dry_run)
+              base_url=args.base_url, repo_name=args.repo_name, dry_run=args.dry_run,
+              allow_shrink=args.allow_shrink)
     if args.watch:
         publish.watch(s, Path(args.watch), args.interval, **kw)
         return 0
@@ -131,6 +132,9 @@ def main(argv=None) -> int:
     pb.add_argument("--watch", help="generator index.json; publish whenever it changes")
     pb.add_argument("--interval", type=float, default=600, help="watch interval in seconds")
     pb.add_argument("--dry-run", action="store_true", help="build and commit locally, do not push")
+    pb.add_argument("--allow-shrink", action="store_true",
+                    help="publish even if the build has far fewer features than the published version "
+                         "(limit: env PUBLISH_MAX_SHRINK, default 0.10)")
     pb.set_defaults(func=cmd_publish)
 
     args = p.parse_args(argv)

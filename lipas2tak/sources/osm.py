@@ -11,8 +11,16 @@ from .http import CachedClient
 log = logging.getLogger(__name__)
 
 
-def build_query(tags: dict[str, str]) -> str:
+BBox = tuple[float, float, float, float]   # south, west, north, east
+
+
+def build_query(tags: dict[str, str], bboxes: list[BBox] | None = None) -> str:
+    """All of Finland, or only the given bounding boxes (e.g. around protected areas)."""
     filt = "".join(f'["{k}"="{v}"]' for k, v in tags.items())
+    if bboxes:
+        parts = "".join(f"{t}{filt}({s:.4f},{w:.4f},{n:.4f},{e:.4f});"
+                        for s, w, n, e in bboxes for t in ("node", "way"))
+        return f"[out:json][timeout:300];({parts});out center tags;"
     return (
         "[out:json][timeout:300];"
         'area["ISO3166-1"="FI"][admin_level=2]->.fi;'
@@ -42,7 +50,8 @@ def check_complete(data: dict, min_elements: int = 0) -> None:
                          f"(previous result); treating it as incomplete")
 
 
-def fetch(client: CachedClient, overpass_urls: str | list[str], tags: dict[str, str]) -> list[dict]:
+def fetch(client: CachedClient, overpass_urls: str | list[str], tags: dict[str, str],
+          bboxes: list[BBox] | None = None) -> list[dict]:
     """Query Overpass; tries each server in turn (public servers are often busy: 504/429).
 
     Incomplete results (error remark, or far fewer elements than the previous
@@ -51,7 +60,7 @@ def fetch(client: CachedClient, overpass_urls: str | list[str], tags: dict[str, 
     from the output.
     """
     urls = [overpass_urls] if isinstance(overpass_urls, str) else list(overpass_urls)
-    q = build_query(tags)
+    q = build_query(tags, bboxes)
     prev = next((d for u in urls if (d := client.cached(u, method="POST", data={"data": q}, quiet=True))
                  is not None), None)
     prev_n = len(prev.get("elements", [])) if prev else 0

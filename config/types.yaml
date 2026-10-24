@@ -20,6 +20,9 @@
 #     loi:    Lipas /v2/lois loi-types
 #     osm:    OpenStreetMap tags (Overpass), e.g. {amenity: toilets}; a list of
 #             dicts = alternatives. Optional context_radius_m / dedupe_radius_m.
+#             only_in_areas: true = only inside national parks, wilderness and
+#             hiking areas (with their buffer), for features that are everywhere
+#             in towns too (parking, info boards).
 
 groups:
   suojat:          {label: {fi: "Laavut, kodat ja tuvat", en: "Shelters and huts"}}
@@ -150,6 +153,7 @@ kinds:
     cot_type: a-u-G
     sources:
       loi: {types: [nature-centre]}
+      osm: {tags: {tourism: information, information: visitor_centre}, context_radius_m: 3000, dedupe_radius_m: 200}
   opastuspiste:
     label: {fi: Opastuspiste, en: Info point}
     tag: {fi: opastuspiste, en: info}
@@ -159,6 +163,12 @@ kinds:
     sources:
       lipas: {type_codes: [207]}
       loi: {types: [information-board]}
+      osm:
+        tags:
+          - {tourism: information, information: board}
+          - {tourism: information, information: map}
+        only_in_areas: true
+        dedupe_radius_m: 50
 
   # --- Other ---------------------------------------------------------------
   puuvaja:
@@ -199,6 +209,7 @@ kinds:
     cot_type: a-u-G
     sources:
       loi: {types: [parking-spot]}
+      osm: {tags: {amenity: parking}, only_in_areas: true, dedupe_radius_m: 100}
 
   # --- Routes -------------------------------------------------------------
   # Similar routes share a colour.

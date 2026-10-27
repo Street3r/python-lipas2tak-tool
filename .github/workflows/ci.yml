@@ -22,8 +22,8 @@ jobs:
       - run: python -m pytest -q
 
   image:
+    # Pull requests build the image too (not pushed), so a broken Dockerfile shows up before merging
     needs: test
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: docker/login-action@v4
+        if: github.event_name == 'push'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -46,6 +47,6 @@ jobs:
       - uses: docker/build-push-action@v7
         with:
           context: .
-          push: true
+          push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

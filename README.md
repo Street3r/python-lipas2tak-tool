@@ -35,6 +35,8 @@ lipas2tak schedule --at "mon 04:00"  # container mode: weekly at a fixed time (-
 lipas2tak publish --raw data/raw --repo <git url> --base-url <public url>   # public build to a git branch
 ```
 
+The Docker image and CI install the exact dependency versions of `requirements.txt` (with hashes; Dependabot keeps it up to date). After changing the dependencies in `pyproject.toml`, regenerate it with `pip-compile --generate-hashes --strip-extras --output-file=requirements.txt pyproject.toml` (pip-tools).
+
 Docker:
 
 ```bash
@@ -50,7 +52,7 @@ Scheduling: with `--at` (env `LIPAS2TAK_SCHEDULE_AT`; time zone `--tz` / `LIPAS2
 
 Coverage check: `python -m lipas2tak.coverage data/raw eramaat` lists the raw Lipas sites, LOIs and OSM elements inside each area of the given categories (or single areas, e.g. `kansallispuistot/petkeljarvi`) that are not in the area's package, with the reason (duplicate, test data, route layer only, route mostly outside the area).
 
-Quality checks: every build lists areas without features, area names missing from `config/area_names.yaml` and files over `quality.max_file_mb` in the log and in `status.json` (`warnings`); the data repository's Stale data workflow opens an issue for them.
+Quality checks: every build lists areas without features, area names missing from `config/area_names.yaml`, files over `quality.max_file_mb`, source failures (an OSM query left out, OSM or region boundaries taken from the cache), areas of the previous build that are missing now, and areas or kinds with more than `quality.max_drop` fewer features than the previous build, in the log and in `status.json` (`warnings`); the data repository's Stale data workflow opens an issue for them. OSM queries share a time budget (`sources.osm.max_total_min`, default 120 min); after it the remaining queries use their cached results.
 
 ### Configuration
 

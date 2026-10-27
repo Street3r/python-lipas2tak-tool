@@ -30,6 +30,8 @@ class CachedClient:
         self.session = requests.Session()
         self.session.headers["User-Agent"] = USER_AGENT
         self._last = 0.0
+        # (url, age in hours) of every expired cached copy used because a request failed
+        self.stale: list[tuple[str, float]] = []
 
     def _key(self, method: str, url: str, params: Any, data: Any) -> Path:
         h = hashlib.sha256(json.dumps([method, url, params, data], sort_keys=True, default=str).encode()).hexdigest()
@@ -44,15 +46,19 @@ class CachedClient:
         if not quiet:
             age_h = (time.time() - path.stat().st_mtime) / 3600
             log.warning("Using cached copy of %s from %.0f h ago", url, age_h)
+            self.stale.append((url, age_h))
         return json.loads(path.read_text(encoding="utf-8"))
 
     def get_json(self, url: str, params: Any = None, *, method: str = "GET", data: Any = None,
                  use_cache: bool = True, retries: int | None = None, timeout_s: float | None = None,
-                 stale_ok: bool = False, validate: Callable[[Any], None] | None = None) -> Any:
+                 stale_ok: bool = False, validate: Callable[[Any], None] | None = None,
+                 deadline: float | None = None) -> Any:
         """Fetch JSON. With stale_ok, an expired cached copy is returned if every attempt fails.
 
         validate is called with each response before it is cached; raising ValueError
         rejects the response (it is retried and never overwrites a good cached copy).
+        deadline (time.time() value): no new attempt is started after it, and a
+        request's timeout is cut so that it ends about then.
         """
         path = self._key(method, url, params, data)
         if use_cache and path.exists() and time.time() - path.stat().st_mtime < self.max_age_s:
@@ -63,11 +69,14 @@ class CachedClient:
         last_err: Exception | None = None
         retries = retries or self.retries
         for attempt in range(retries):
+            timeout = timeout_s or self.timeout_s
+            if deadline is not None:
+                timeout = max(30.0, min(timeout, deadline - time.time()))
             try:
                 if method == "POST":
-                    r = self.session.post(url, params=params, data=data, timeout=timeout_s or self.timeout_s)
+                    r = self.session.post(url, params=params, data=data, timeout=timeout)
                 else:
-                    r = self.session.get(url, params=params, timeout=timeout_s or self.timeout_s)
+                    r = self.session.get(url, params=params, timeout=timeout)
                 self._last = time.time()
                 if r.status_code in (429, 502, 503, 504):
                     raise requests.HTTPError(f"{r.status_code}", response=r)
@@ -79,14 +88,18 @@ class CachedClient:
                 return payload
             except (requests.RequestException, ValueError) as e:
                 last_err = e
+                backoff = self.BACKOFF_S[min(attempt, len(self.BACKOFF_S) - 1)]
                 if attempt + 1 == retries:
                     break
-                backoff = self.BACKOFF_S[min(attempt, len(self.BACKOFF_S) - 1)]
+                if deadline is not None and time.time() + backoff >= deadline:
+                    log.warning("Request failed (%s), time budget used up: %s", url, e)
+                    break
                 log.warning("Request failed (%s), attempt %d/%d, retrying in %ss: %s",
                             url, attempt + 1, retries, backoff, e)
                 time.sleep(backoff)
         if stale_ok and path.exists():
             age_h = (time.time() - path.stat().st_mtime) / 3600
             log.warning("Request failed (%s): using cached copy from %.0f h ago", url, age_h)
+            self.stale.append((url, age_h))
             return json.loads(path.read_text(encoding="utf-8"))
         raise RuntimeError(f"Request failed: {url}") from last_err

@@ -338,6 +338,39 @@ class PipelineTests(unittest.TestCase):
         status = json.loads((self.tmp / "out" / "status.json").read_text())
         self.assertEqual(status["warnings"], w)
 
+    def test_comparison_with_previous_build(self):
+        self.settings.raw["quality"] = {"max_drop": 0.3, "min_compare": 1}
+        self.run_once()
+        self.assertFalse(any("previous build" in w for w in self.run_once()["warnings"]))
+        # A park disappears from Lipas, most toilets from the sources, and the region boundaries are lost
+        nuuksio = [s for s in self.raw.area_sites["kansallispuistot"] if "Nuuksio" in s["name"]]
+        self.assertTrue(nuuksio)
+        self.raw.area_sites["kansallispuistot"] = [s for s in self.raw.area_sites["kansallispuistot"]
+                                                   if s not in nuuksio]
+        self.raw.regions = []
+        self.raw.warnings = ["OSM kayma amenity=toilets: Overpass failed, used the cached result from 9 days ago"]
+        res = self.run_once()
+        w = res["warnings"]
+        self.assertIn("kansallispuistot/nuuksio: in the previous build but missing now, no package", w)
+        self.assertIn("maakunnat: no region boundaries, no region packages", w)
+        self.assertTrue(any(x.startswith("maakunnat/") and "missing now" in x for x in w))
+        self.assertIn(self.raw.warnings[0], w)
+        status = json.loads((self.tmp / "out" / "status.json").read_text())
+        self.assertEqual(status["warnings"], w)
+
+    def test_feature_drop_warning(self):
+        self.settings.raw["quality"] = {"max_drop": 0.3, "min_compare": 1}
+        self.run_once()
+        self.raw.sites = self.raw.sites[: len(self.raw.sites) // 3]
+        self.raw.lois = []
+        self.raw.osm = {}
+        w = self.run_once()["warnings"]
+        self.assertTrue(any(x.startswith("kansallispuistot/nuuksio: ") and "in the previous build (-" in x
+                            for x in w), w)
+        self.assertTrue(any(x.startswith("kind ") for x in w), w)
+        # The next build compares with this one: no warning when nothing changes
+        self.assertFalse(any("previous build" in x for x in self.run_once()["warnings"]))
+
     def test_area_english_names(self):
         from lipas2tak import areas
         sq = [[24.4, 60.2], [24.5, 60.2], [24.5, 60.3], [24.4, 60.2]]

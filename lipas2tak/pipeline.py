@@ -7,6 +7,7 @@ import json
 import logging
 import math
 import shutil
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,8 +33,9 @@ class RawData:
     osm: dict[str, list[dict]] = field(default_factory=dict)     # kind -> OSM elements
     area_sites: dict[str, list[dict]] = field(default_factory=dict)  # category -> Lipas area sites
     regions: list[dict] = field(default_factory=list)            # GeoJSON features
+    warnings: list[str] = field(default_factory=list)            # source problems of the fetch
 
-    FILES = ("sites", "lois", "osm", "area_sites", "regions")
+    FILES = ("sites", "lois", "osm", "area_sites", "regions", "warnings")
 
     def dump(self, d: Path) -> None:
         d.mkdir(parents=True, exist_ok=True)
@@ -66,25 +68,58 @@ def fetch_raw(settings: Settings, clf: normalize.Classifier) -> RawData:
     oc = settings.get("sources", "osm") or {}
     if oc.get("enabled"):
         bboxes = area_bboxes(settings, raw)
+        # Time budget of all OSM queries: when the Overpass servers are stuck, the
+        # remaining queries use their cached results instead of hours of retries
+        budget_min = float(oc.get("max_total_min", 120))
+        deadline = time.time() + budget_min * 60
         for kind, tags in clf.osm_queries():
             only_in_areas = clf.osm_source(kind).get("only_in_areas")
             if only_in_areas and not bboxes:
                 continue
+            what = f"OSM {kind} {_tags_text(tags)}"
+            n_stale = len(client.stale)
             try:
                 urls = [oc["overpass_url"], *(oc.get("overpass_fallback_urls") or [])]
-                els = osm.fetch(client, urls, tags, bboxes if only_in_areas else None)
+                els = osm.fetch(client, urls, tags, bboxes if only_in_areas else None, deadline=deadline)
             except Exception as e:  # OSM is a supplementary source: errors do not abort the run
                 log.error("OSM query failed (%s %s): %s", kind, tags, e)
+                raw.warnings.append(f"{what}: query failed and no cached result, left out of this build")
                 continue
+            if len(client.stale) > n_stale:
+                raw.warnings.append(f"{what}: Overpass failed, used the cached result from "
+                                    f"{_age_text(client.stale[-1][1])}")
             seen = {(e["type"], e["id"]) for e in raw.osm.get(kind, [])}
             raw.osm.setdefault(kind, []).extend(e for e in els if (e["type"], e["id"]) not in seen)
+        if time.time() >= deadline:
+            raw.warnings.append(f"OSM: time budget of {budget_min:g} min used up; "
+                                "the remaining queries used cached results")
     if (settings.get("areas", "maakunnat") or {}).get("enabled"):
         rc = settings.get("sources", "regions")
+        n_stale = len(client.stale)
+        # Boundaries rarely change: if the service fails or returns nothing, the
+        # previous result is used rather than dropping every region package
         data = client.get_json(rc["wfs_url"], params={
             "service": "WFS", "version": "2.0.0", "request": "GetFeature", "typeName": rc["layer"],
-            "outputFormat": "application/json", "srsName": "EPSG:4326"})
+            "outputFormat": "application/json", "srsName": "EPSG:4326"},
+            stale_ok=True, validate=_has_features)
+        if len(client.stale) > n_stale:
+            raw.warnings.append(f"Region boundaries: Statistics Finland WFS failed, used the cached result "
+                                f"from {_age_text(client.stale[-1][1])}")
         raw.regions = data.get("features", [])
     return raw
+
+
+def _has_features(data) -> None:
+    if not (data or {}).get("features"):
+        raise ValueError("no features in the response")
+
+
+def _tags_text(tags: dict) -> str:
+    return ",".join(f"{k}={v}" for k, v in tags.items())
+
+
+def _age_text(hours: float) -> str:
+    return f"{hours / 24:.0f} days ago" if hours >= 48 else f"{hours:.0f} h ago"
 
 
 def area_bboxes(settings: Settings, raw: RawData) -> list[tuple[float, float, float, float]]:
@@ -374,13 +409,18 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     iconset.write(staging / "iconset" / "lipas2tak_iconset.zip", settings.icon_dirs(), used_icons)
 
     state_path = settings.path("cache") / "state.json"
-    times = _load_state(state_path).get("since", {})
+    prev_state = _load_state(state_path)
+    times = prev_state.get("since", {})
     index_areas = []
-    warnings: list[str] = []
+    warnings: list[str] = list(raw.warnings)
     targets = [a for a in all_areas.values() if not only or a.key in only or a.slug in only]
     for area in sorted(targets, key=lambda a: a.key):
         if area.name_guessed:
             warnings.append(f"{area.key}: base form of '{area.name.fi}' guessed; add it to config/area_names.yaml")
+    if (settings.get("areas", "maakunnat") or {}).get("enabled") and \
+            not any(a.category == "maakunnat" for a in all_areas.values()):
+        warnings.append("maakunnat: no region boundaries, no region packages")
+    empty: set[str] = set()
     in_packages = [f for f in feats if settings.kinds[f.kind].area_packages]
     for area in sorted(targets, key=lambda a: (a.category, a.slug)):
         if area.category == "maakunnat":
@@ -390,6 +430,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         if not sel:
             log.info("%s: no features, skipped", area.key)
             warnings.append(f"{area.key}: no features, no package")
+            empty.add(area.key)
             continue
         index_areas.extend(write_area(settings, area, sel, all_areas, staging, now, times))
     route_outs = settings.get("route_types", "outputs", default=None) or {}
@@ -402,6 +443,11 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
                 index_areas.append(e)
 
     links, link_packages = write_link_collections(settings, index_areas, staging)
+    kind_counts: dict[str, int] = {}
+    for f in feats:
+        kind_counts[f.kind] = kind_counts.get(f.kind, 0) + 1
+    if not only:
+        warnings.extend(compare_with_previous(settings, prev_state, index_areas, kind_counts, empty))
 
     index = {
         "generated": now.isoformat(),
@@ -439,7 +485,7 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     (staging / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
     (staging / "index.html").write_text(render_index_html(index), encoding="utf-8")
 
-    changes = diff_state(state_path, index_areas, now, times)
+    changes = diff_state(state_path, index_areas, now, times, kind_counts if not only else None)
     # Atomic swap: old (removed) files disappear at the same time
     old = out_root.parent / (out_root.name + ".old")
     if old.exists():
@@ -571,14 +617,49 @@ def _link_package(outs: dict, kml_path: Path, name: str, base_url: str, out_root
 
 # --- Change tracking --------------------------------------------------------------
 
+def compare_with_previous(settings: Settings, prev_state: dict, entries: list[dict], kind_counts: dict[str, int],
+                          empty: set[str]) -> list[str]:
+    """Quality warnings against the previous build (cache/state.json).
+
+    - an area (package) of the previous build is missing now, e.g. a park left
+      Lipas or a source returned nothing (areas without features are already
+      reported as such)
+    - an area or a kind has far fewer features than before (quality.max_drop)
+    """
+    max_drop = float(settings.get("quality", "max_drop", default=0.3))
+    min_compare = int(settings.get("quality", "min_compare", default=20))
+    lang = settings.languages[0]
+    prev_areas = {k.rsplit("/", 1)[0]: len(v) for k, v in (prev_state.get("areas") or {}).items()
+                  if k.endswith(f"/{lang}")}
+    cur_areas = {e["key"]: len(e["uids"]) for e in entries if e["lang"] == lang}
+    out = []
+    for key in sorted(set(prev_areas) - set(cur_areas) - empty):
+        out.append(f"{key}: in the previous build but missing now, no package")
+
+    def drop(name: str, before: int, now: int) -> None:
+        if before >= min_compare and now < before * (1 - max_drop):
+            out.append(f"{name}: {now} features, {before} in the previous build "
+                       f"({(now - before) / before:.0%})")
+
+    for key in sorted(set(prev_areas) & set(cur_areas)):
+        drop(key, prev_areas[key], cur_areas[key])
+    for kind, before in sorted((prev_state.get("kinds") or {}).items()):
+        drop(f"kind {kind}", before, kind_counts.get(kind, 0))
+    return out
+
+
 def _load_state(state_path: Path) -> dict:
     if state_path.exists():
         return json.loads(state_path.read_text(encoding="utf-8"))
     return {}
 
 
-def diff_state(state_path: Path, entries: list[dict], now: datetime, times: Optional[dict] = None) -> dict:
-    """Compare with the previous run (UID -> content digest) and store the new state."""
+def diff_state(state_path: Path, entries: list[dict], now: datetime, times: Optional[dict] = None,
+               kinds: Optional[dict[str, int]] = None) -> dict:
+    """Compare with the previous run (UID -> content digest) and store the new state.
+
+    `kinds`: feature count per kind (kept for the quality comparison of the next run).
+    """
     cur = {f"{e['key']}/{e['lang']}": e["uids"] for e in entries}
     old_state = _load_state(state_path)
     prev = old_state.get("areas", {})
@@ -594,8 +675,12 @@ def diff_state(state_path: Path, entries: list[dict], now: datetime, times: Opti
     since = times if times is not None else old_state.get("since", {})
     live = {f"{k}:{u}" for k, uids in cur.items() for u in uids}
     since = {k: v for k, v in since.items() if k in live or k.split(":", 1)[0] not in cur}
-    state_path.write_text(json.dumps({"generated": now.isoformat(), "areas": cur, "since": since}),
-                          encoding="utf-8")
+    state = {"generated": now.isoformat(), "areas": cur, "since": since}
+    if kinds is not None:
+        state["kinds"] = kinds
+    elif old_state.get("kinds"):
+        state["kinds"] = old_state["kinds"]
+    state_path.write_text(json.dumps(state), encoding="utf-8")
     log_path = state_path.parent / "changes.jsonl"
     with log_path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps({"generated": now.isoformat(), "changes": {

@@ -5,6 +5,7 @@ OSM data © OpenStreetMap contributors, ODbL 1.0.
 from __future__ import annotations
 
 import logging
+import time
 
 from .http import CachedClient
 
@@ -51,13 +52,14 @@ def check_complete(data: dict, min_elements: int = 0) -> None:
 
 
 def fetch(client: CachedClient, overpass_urls: str | list[str], tags: dict[str, str],
-          bboxes: list[BBox] | None = None) -> list[dict]:
+          bboxes: list[BBox] | None = None, deadline: float | None = None) -> list[dict]:
     """Query Overpass; tries each server in turn (public servers are often busy: 504/429).
 
     Incomplete results (error remark, or far fewer elements than the previous
     result) are rejected like failed requests. If every server fails, the previous
     cached result is used, so a busy Overpass does not make OSM features disappear
-    from the output.
+    from the output. After `deadline` (time.time() value) no server is queried
+    and the cached result is used directly.
     """
     urls = [overpass_urls] if isinstance(overpass_urls, str) else list(overpass_urls)
     q = build_query(tags, bboxes)
@@ -66,18 +68,22 @@ def fetch(client: CachedClient, overpass_urls: str | list[str], tags: dict[str, 
     prev_n = len(prev.get("elements", [])) if prev else 0
     min_elements = int(prev_n * MIN_RATIO) if prev_n >= MIN_PREVIOUS else 0
     last: Exception | None = None
+    data = None
     for i, url in enumerate(urls):
+        if deadline is not None and time.time() >= deadline:
+            log.warning("OSM time budget used up: not querying %s", url)
+            break
         is_last = i == len(urls) - 1
         try:
             data = client.get_json(url, method="POST", data={"data": q}, retries=4, timeout_s=330,
-                                   stale_ok=False,
+                                   stale_ok=False, deadline=deadline,
                                    validate=lambda d: check_complete(d, min_elements))
             break
         except RuntimeError as e:
             last = e
             log.warning("Overpass server failed: %s%s", url, "" if is_last else ", trying the next one")
-    else:
-        # Every server failed: fall back to the newest cached result of any server
+    if data is None:
+        # Every server failed (or no time left): fall back to the newest cached result of any server
         data = next((d for u in urls if (d := client.cached(u, method="POST", data={"data": q})) is not None),
                     None)
         if data is None:

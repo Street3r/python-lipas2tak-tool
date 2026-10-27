@@ -39,6 +39,10 @@ sources:
     context_radius_m: 300
     # If Lipas/LOI has a feature of the same group this close, the OSM feature is skipped.
     dedupe_radius_m: 40
+    # Time budget of all OSM queries of a run (minutes). A normal run needs a
+    # fraction of this; when the servers are stuck, the remaining queries use
+    # their cached results instead of retrying for hours (shown as a warning).
+    max_total_min: 120
   regions:
     # Statistics Finland regional boundaries (CC BY 4.0)
     wfs_url: "https://geo.stat.fi/geoserver/tilastointialueet/wfs"
@@ -172,6 +176,10 @@ outputs:
 # Quality checks of a build. Findings are logged, written to status.json
 # ("warnings") and turned into an issue by the data repository's Stale data
 # workflow: areas without features, area names missing from area_names.yaml,
-# files larger than this.
+# files larger than max_file_mb, source failures (OSM or region boundaries
+# taken from the cache, OSM queries left out), areas of the previous build that
+# are missing now, and areas or kinds with far fewer features than before.
 quality:
   max_file_mb: 50
+  max_drop: 0.3       # warn when an area or kind has more than this share fewer features
+  min_compare: 20     # ... and had at least this many before (small areas vary a lot)

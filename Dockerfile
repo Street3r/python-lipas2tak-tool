@@ -1,4 +1,5 @@
-FROM python:3.12-slim
+# Pinned by digest (Dependabot updates it); dependencies come from the locked requirements.txt
+FROM python:3.12-slim@sha256:12316debbfb86890f6b2d825820612741ba527ad5a44e3902759141d572bfe8f
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -10,9 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends git openssh-cli
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 COPY pyproject.toml README.md ./
 COPY lipas2tak ./lipas2tak
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-deps .
 
 COPY config ./config
 COPY icons ./icons

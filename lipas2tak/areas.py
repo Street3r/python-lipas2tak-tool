@@ -44,6 +44,9 @@ def areas_from_lipas_sites(sites: list[dict], category: str, cfg: dict,
                 polys.extend(g["coordinates"])
         if not polys:
             continue
+        if not s.get("name") and s.get("lipas-id") is None:
+            log.warning("%s: area without name and id skipped", category)
+            continue
         full = s.get("name") or str(s["lipas-id"])
         short = short_name(full, strip, names)
         nfc = unicodedata.normalize("NFC", full)

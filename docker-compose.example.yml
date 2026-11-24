@@ -13,4 +13,4 @@ services:
     image: nginx:1.31-alpine
     ports: ["8080:80"]
     volumes:
-      - ./data/output:/usr/share/nginx/html:ro
+      - ./data/output-only:/usr/share/nginx/html:ro   # --only builds go to output-only/

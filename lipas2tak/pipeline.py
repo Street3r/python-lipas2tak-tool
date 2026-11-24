@@ -16,6 +16,7 @@ from typing import Optional
 from . import areas as areas_mod
 from . import attribution, geo, normalize, remarks, waypoints
 from .config import Settings, file_slug
+from .fileutil import read_json, write_json_atomic
 from .model import AreaDef, Feature, Localized
 from .sources import lipas, osm, regions
 from .sources.http import CachedClient
@@ -40,7 +41,7 @@ class RawData:
     def dump(self, d: Path) -> None:
         d.mkdir(parents=True, exist_ok=True)
         for name in self.FILES:
-            (d / f"{name}.json").write_text(json.dumps(getattr(self, name), ensure_ascii=False), encoding="utf-8")
+            write_json_atomic(d / f"{name}.json", getattr(self, name), ensure_ascii=False)
 
     @classmethod
     def load(cls, d: Path) -> "RawData":
@@ -139,16 +140,46 @@ def area_bboxes(settings: Settings, raw: RawData) -> list[tuple[float, float, fl
 
 # --- Enrichment ---------------------------------------------------------------
 
-def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
-                   ) -> tuple[list[Feature], dict[str, AreaDef]]:
+class _Skipped:
+    """Source records that could not be converted (unexpected data); counted per source.
+
+    The sources are external, so one odd record must not stop the whole run.
+    """
+
+    def __init__(self) -> None:
+        self.by_source: dict[str, list[str]] = {}
+
+    def convert(self, source: str, record: dict, fn, *args):
+        """fn(record, *args), or None if it fails."""
+        try:
+            return fn(record, *args)
+        except Exception as e:  # noqa: BLE001 - any error in one record skips only that record
+            rid = (record.get("lipas-id") or record.get("id")) if isinstance(record, dict) else None
+            ident = f"{source} {rid}" if rid is not None else source
+            log.warning("Skipping %s: %s: %s", ident, type(e).__name__, e)
+            self.by_source.setdefault(source, []).append(str(rid) if rid is not None else "?")
+            return None
+
+    def warnings(self) -> list[str]:
+        out = []
+        for source, ids in sorted(self.by_source.items()):
+            shown = ", ".join(ids[:5]) + (", ..." if len(ids) > 5 else "")
+            out.append(f"{source}: {len(ids)} records skipped because of unexpected data ({shown}); see the log")
+        return out
+
+
+def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier,
+                   warnings: Optional[list[str]] = None) -> tuple[list[Feature], dict[str, AreaDef]]:
+    """Normalise and enrich all source records. Problems are appended to `warnings`."""
     feats: list[Feature] = []
+    skipped = _Skipped()
     log.info("Processing %d Lipas sites and %d LOIs", len(raw.sites), len(raw.lois))
     for n, s in enumerate(raw.sites, 1):
-        feats.extend(normalize.lipas_site_to_features(s, clf, settings))
+        feats.extend(skipped.convert("Lipas site", s, normalize.lipas_site_to_features, clf, settings) or [])
         if n % 2000 == 0:
             log.info("  %d/%d", n, len(raw.sites))
     for l in raw.lois:
-        f = normalize.loi_to_feature(l, clf)
+        f = skipped.convert("Lipas LOI", l, normalize.loi_to_feature, clf)
         if f:
             feats.append(f)
     # Same UID twice (e.g. overlapping pages) -> last one wins
@@ -170,7 +201,7 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
     for kind, els in raw.osm.items():
         if kind not in enabled:
             continue
-        cand = [f for f in (normalize.osm_to_feature(e, kind) for e in els) if f]
+        cand = [f for f in (skipped.convert(f"OSM {kind}", e, normalize.osm_to_feature, kind) for e in els) if f]
         candidates[kind] = [f for f in cand if not clf.excluded(f.name.fi)]
     # An OSM element can match several kinds (e.g. a lean-to also tagged as a fire pit):
     # keep one feature under the main kind and add the other as a service
@@ -188,6 +219,8 @@ def build_features(settings: Settings, raw: RawData, clf: normalize.Classifier
         feats.extend(kept)
 
     log.info("Features after normalisation: %d", len(feats))
+    if warnings is not None:
+        warnings.extend(skipped.warnings())
     regs = regions.fetch_regions_from_features(raw.regions) if raw.regions else []
     if regs:
         before = len(feats)
@@ -393,13 +426,25 @@ def write_area(settings: Settings, area: AreaDef, feats: list[Feature], all_area
     return entries
 
 
+def output_dir(settings: Settings, only: Optional[list[str]] = None) -> Path:
+    """Output directory; partial builds (`only`) go to a directory of their own."""
+    out = settings.path("output")
+    return out.parent / (out.name + "-only") if only else out
+
+
 def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
         now: Optional[datetime] = None, next_check: Optional[datetime] = None) -> dict:
-    """Produce all files. `only`: restrict to area keys or slugs (e.g. kansallispuistot/nuuksio)."""
+    """Produce all files. `only`: restrict to area keys or slugs (e.g. kansallispuistot/nuuksio).
+
+    A run with `only` is a test build: it is written to a separate directory
+    (`<output>-only`) and does not update the state of the previous run, so the
+    full output and the comparison with the previous build stay intact.
+    """
     now = now or datetime.now(timezone.utc)
     clf = normalize.Classifier(settings)
-    feats, all_areas = build_features(settings, raw, clf)
-    out_root = settings.path("output")
+    warnings: list[str] = list(raw.warnings)
+    feats, all_areas = build_features(settings, raw, clf, warnings)
+    out_root = output_dir(settings, only)
     staging = out_root.parent / (out_root.name + ".staging")
     if staging.exists():
         shutil.rmtree(staging)
@@ -410,9 +455,10 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
 
     state_path = settings.path("cache") / "state.json"
     prev_state = _load_state(state_path)
-    times = prev_state.get("since", {})
+    times = dict(prev_state.get("since", {}))
     index_areas = []
-    warnings: list[str] = list(raw.warnings)
+    if state_path.exists() and not prev_state:
+        warnings.append("state.json unreadable: no comparison with the previous build this time")
     targets = [a for a in all_areas.values() if not only or a.key in only or a.slug in only]
     for area in sorted(targets, key=lambda a: a.key):
         if area.name_guessed:
@@ -485,8 +531,8 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     (staging / "index.json").write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
     (staging / "index.html").write_text(render_index_html(index), encoding="utf-8")
 
-    changes = diff_state(state_path, index_areas, now, times, kind_counts if not only else None)
-    # Atomic swap: old (removed) files disappear at the same time
+    # Swap the new output in with two renames (the directory is missing only
+    # between them), so files removed from the build disappear at the same time
     old = out_root.parent / (out_root.name + ".old")
     if old.exists():
         shutil.rmtree(old)
@@ -495,6 +541,11 @@ def run(settings: Settings, raw: RawData, only: Optional[list[str]] = None,
     staging.rename(out_root)
     if old.exists():
         shutil.rmtree(old)
+    # State is saved only after the output is in place, so it never runs ahead of it
+    if only:
+        changes = diff_state(state_path, index_areas, now, times, save=False)
+    else:
+        changes = diff_state(state_path, index_areas, now, times, kind_counts)
     log.info("Done: %d areas, %d features", len({e['key'] for e in index_areas}), len(feats))
     return {"index": index, "changes": changes, "features": len(feats), "warnings": warnings}
 
@@ -649,20 +700,23 @@ def compare_with_previous(settings: Settings, prev_state: dict, entries: list[di
 
 
 def _load_state(state_path: Path) -> dict:
-    if state_path.exists():
-        return json.loads(state_path.read_text(encoding="utf-8"))
-    return {}
+    """Previous run's state; empty if missing or unreadable (the run then has no comparison)."""
+    state = read_json(state_path, {})
+    return state if isinstance(state, dict) else {}
 
 
 def diff_state(state_path: Path, entries: list[dict], now: datetime, times: Optional[dict] = None,
-               kinds: Optional[dict[str, int]] = None) -> dict:
+               kinds: Optional[dict[str, int]] = None, save: bool = True) -> dict:
     """Compare with the previous run (UID -> content digest) and store the new state.
 
     `kinds`: feature count per kind (kept for the quality comparison of the next run).
+    `save=False` (partial build): only the areas built are compared, nothing is stored.
     """
     cur = {f"{e['key']}/{e['lang']}": e["uids"] for e in entries}
     old_state = _load_state(state_path)
     prev = old_state.get("areas", {})
+    if not save:
+        prev = {k: v for k, v in prev.items() if k in cur}
     changes = {}
     for key in sorted(set(cur) | set(prev)):
         a, b = prev.get(key, {}), cur.get(key, {})
@@ -671,6 +725,8 @@ def diff_state(state_path: Path, entries: list[dict], now: datetime, times: Opti
         modified = sorted(u for u in set(a) & set(b) if a[u] != b[u])
         if added or removed or modified:
             changes[key] = {"added": added, "removed": removed, "modified": modified}
+    if not save:
+        return changes
     state_path.parent.mkdir(parents=True, exist_ok=True)
     since = times if times is not None else old_state.get("since", {})
     live = {f"{k}:{u}" for k, uids in cur.items() for u in uids}
@@ -680,7 +736,7 @@ def diff_state(state_path: Path, entries: list[dict], now: datetime, times: Opti
         state["kinds"] = kinds
     elif old_state.get("kinds"):
         state["kinds"] = old_state["kinds"]
-    state_path.write_text(json.dumps(state), encoding="utf-8")
+    write_json_atomic(state_path, state)
     log_path = state_path.parent / "changes.jsonl"
     with log_path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps({"generated": now.isoformat(), "changes": {

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
-from .xmltext import escape
+from .xmltext import escape, quoteattr
 
 from .. import attribution
 from ..geo import Line
@@ -20,9 +20,9 @@ HEADER = ('<?xml version="1.0" encoding="UTF-8"?>\n'
 def route_gpx(name: str, desc: str, lines: list, link: str = "") -> str:
     """`lines`: [Line] or [(Line, {vertex index: name})] – named points get a <name>."""
     parts = [HEADER, f"<metadata><name>{escape(name)}</name>",
-             f'<copyright author="{escape(attribution.GPX_AUTHOR)}"><license>{attribution.LICENSE_URL}</license></copyright>']
+             f'<copyright author={quoteattr(attribution.GPX_AUTHOR)}><license>{attribution.LICENSE_URL}</license></copyright>']
     if link:
-        parts.append(f'<link href="{escape(link)}"/>')
+        parts.append(f"<link href={quoteattr(link)}/>")
     parts.append("</metadata>\n")
     for i, item in enumerate(lines, 1):
         line, names = item if isinstance(item, tuple) else (item, {})

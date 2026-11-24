@@ -104,6 +104,41 @@ class GeoTests(unittest.TestCase):
         areas_mod.assign_regions(out, regs)
         self.assertEqual([g.region for g in out], ["maakunnat/a", "maakunnat/b"])
 
+    def test_route_parts_get_areas_separately(self):
+        # Two disconnected parts ~50 km apart; the area covers only the first.
+        # Each part must get its own area list (they used to share one).
+        from lipas2tak import areas as areas_mod, normalize
+        from lipas2tak.model import AreaDef, Localized
+        settings = load_settings()
+        clf = normalize.Classifier(settings)
+        def ln(x0, fid):
+            coords = [[x0 + i * 0.01, 60.3] for i in range(6)]       # ~2.8 km
+            return {"type": "Feature", "id": fid, "geometry": {"type": "LineString", "coordinates": coords}}
+        site = {"lipas-id": 7, "type": {"type-code": 4405}, "name": "Kaksiosainen reitti", "status": "active",
+                "properties": {}, "location": {"geometries": {"features": [ln(24.0, "a"), ln(24.9, "b")]}}}
+        parts = normalize.lipas_site_to_features(site, clf, settings)
+        self.assertEqual([p.uid for p in parts], ["lipas-7-1", "lipas-7-2"])
+        park = {"type": "Polygon", "coordinates": [[[23.9, 60.2], [24.2, 60.2], [24.2, 60.4], [23.9, 60.4], [23.9, 60.2]]]}
+        areas_mod.assign_areas(parts, [AreaDef("puisto", "kansallispuistot", Localized("Puisto"), "puisto", park)])
+        self.assertEqual([p.areas for p in parts], [["kansallispuistot/puisto"], []])
+        self.assertIsNot(parts[0].services, parts[1].services)
+
+    def test_region_sections_get_areas_separately(self):
+        from lipas2tak import areas as areas_mod
+        from lipas2tak.model import AreaDef, Feature, Localized
+        def box(x0, x1):
+            return {"type": "Polygon", "coordinates": [[[x0, 60], [x1, 60], [x1, 61], [x0, 61], [x0, 60]]]}
+        regs = [AreaDef("a", "maakunnat", Localized("A"), "a", box(24, 25)),
+                AreaDef("b", "maakunnat", Localized("B"), "b", box(25, 26))]
+        line = [(24.1 + i * 0.02, 60.5) for i in range(85)]
+        f = Feature(uid="lipas-9", source="lipas", source_id="9", kind="retkeilyreitti",
+                    name=Localized("Pitkä reitti"), lines=[line])
+        out = areas_mod.split_routes_by_region([f], regs)
+        park = AreaDef("puisto", "kansallispuistot", Localized("Puisto"), "puisto", box(25.5, 25.9))
+        areas_mod.assign_areas(out, [park])
+        self.assertEqual([g.areas for g in out], [[], ["kansallispuistot/puisto"]])
+        self.assertEqual(f.areas, [])
+
     def test_merge_strokes_through_junction(self):
         # A cross: four arms meeting at one point become two straight lines
         c = (24.5, 60.3)

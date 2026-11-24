@@ -1,7 +1,7 @@
 """Internal data model: all sources are normalised to these."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from typing import Optional
 
 from .geo import Coord, Line
@@ -68,6 +68,16 @@ class Feature:
         if self.point:
             return [self.point]
         return [c for l in self.lines for c in l]
+
+    def part(self, **changes) -> "Feature":
+        """Copy of this feature for one part of a split route.
+
+        List fields (areas, services, ...) are copied, so that assigning an
+        area to one part does not leak to the other parts.
+        """
+        lists = {fl.name: list(getattr(self, fl.name)) for fl in fields(self)
+                 if isinstance(getattr(self, fl.name), list)}
+        return replace(self, **{**lists, **changes})
 
 
 @dataclass

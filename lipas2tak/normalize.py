@@ -1,7 +1,6 @@
 """Convert source data to the internal model (Feature) and resolve the feature kind."""
 from __future__ import annotations
 
-import copy
 import logging
 import re
 from typing import Iterable, Optional
@@ -204,12 +203,9 @@ def lipas_site_to_features(site: dict, clf: Classifier, settings: Settings) -> l
             split.append(f)
             continue
         for i, line in enumerate(f.lines, 1):
-            g = copy.copy(f)
-            g.uid = f"{f.uid}-{i}"
-            g.lines = [line]
-            g.length_km = round(geo.line_length_m(line) / 1000, 1)
-            g.group_uid = f.uid
-            split.append(g)
+            split.append(f.part(uid=f"{f.uid}-{i}", lines=[line],
+                                length_km=round(geo.line_length_m(line) / 1000, 1),
+                                group_uid=f.uid))
     return split
 
 

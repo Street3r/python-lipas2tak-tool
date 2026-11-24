@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import copy
 import re
 import unicodedata
 
@@ -44,6 +43,9 @@ def areas_from_lipas_sites(sites: list[dict], category: str, cfg: dict,
             elif g.get("type") == "MultiPolygon":
                 polys.extend(g["coordinates"])
         if not polys:
+            continue
+        if not s.get("name") and s.get("lipas-id") is None:
+            log.warning("%s: area without name and id skipped", category)
             continue
         full = s.get("name") or str(s["lipas-id"])
         short = short_name(full, strip, names)
@@ -151,13 +153,10 @@ def split_routes_by_region(features: list[Feature], regions: list[AreaDef],
             out.append(f)
             continue
         for n, (a, b, key) in enumerate(merged, 1):
-            g = copy.copy(f)
-            g.uid = f"{f.uid}-m{n}"
-            g.lines = [line[max(0, a - 1) if n > 1 else a:b + 1]]
-            g.length_km = round(line_len(g.lines[0]) / 1000, 1)
-            g.group_uid = f.group_uid or f.uid
-            g.waypoints = []
-            out.append(g)
+            piece = line[max(0, a - 1) if n > 1 else a:b + 1]
+            out.append(f.part(uid=f"{f.uid}-m{n}", lines=[piece],
+                              length_km=round(line_len(piece) / 1000, 1),
+                              group_uid=f.group_uid or f.uid, waypoints=[]))
     return out
 
 

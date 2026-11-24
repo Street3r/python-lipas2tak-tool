@@ -492,7 +492,9 @@ def representative_point(geometry: dict) -> Coord:
     if t == "MultiLineString":
         longest = max(c, key=len)
         return tuple(longest[len(longest) // 2][:2])  # type: ignore[return-value]
+    if t == "MultiPolygon":   # the polygon with the most vertices
+        t, c = "Polygon", max(c, key=lambda poly: len(poly[0]))
     if t == "Polygon":
         ring = c[0]
         return sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring)
-    raise ValueError(t)
+    raise ValueError(f"unsupported geometry type: {t}")

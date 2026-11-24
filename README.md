@@ -28,7 +28,7 @@ Scheduling, file distribution (nginx) and TAK Server feeders live in [docker-lip
 ```bash
 pip install -e .
 lipas2tak run                      # fetch everything and write data/output/
-lipas2tak run --only nuuksio       # a single area (slug or key, e.g. kansallispuistot/nuuksio)
+lipas2tak run --only nuuksio       # test build of a single area into data/output-only/ (slug or key)
 lipas2tak fetch --dump data/raw    # save the raw data
 lipas2tak build --raw data/raw     # build from saved raw data without network access
 lipas2tak schedule --at "mon 04:00"  # container mode: weekly at a fixed time (--tz, default Europe/Helsinki)
@@ -47,6 +47,10 @@ docker run --rm -v "$PWD/data:/data" -e LIPAS2TAK_PUBLIC_BASE_URL=https://exampl
 Prebuilt image: `ghcr.io/street3r/python-lipas2tak-tool` (tags `main`, versions such as `0.1.0`, and `sha-<commit>`), built by CI from this repository.
 
 Tests: `python -m unittest discover -s tests`
+
+A run with `--only` is a test build: it is written to `<output>-only/` and leaves the full output and `state.json` (the comparison base of the quality checks) untouched.
+
+A source record that cannot be converted (unexpected geometry, missing id) is skipped and reported as a quality warning; it does not stop the run. State and cache files are written atomically, and an unreadable one is treated as missing.
 
 Scheduling: with `--at` (env `LIPAS2TAK_SCHEDULE_AT`; time zone `--tz` / `LIPAS2TAK_TZ`) the run happens weekly at that local time. On start it runs at once only if the previous scheduled run was missed (or with `--run-now`), so restarts and updates do not move the schedule. Without `--at`, `--every-days N` runs at start and then every N days.
 

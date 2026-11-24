@@ -104,6 +104,41 @@ class GeoTests(unittest.TestCase):
         areas_mod.assign_regions(out, regs)
         self.assertEqual([g.region for g in out], ["maakunnat/a", "maakunnat/b"])
 
+    def test_route_parts_get_areas_separately(self):
+        # Two disconnected parts ~50 km apart; the area covers only the first.
+        # Each part must get its own area list (they used to share one).
+        from lipas2tak import areas as areas_mod, normalize
+        from lipas2tak.model import AreaDef, Localized
+        settings = load_settings()
+        clf = normalize.Classifier(settings)
+        def ln(x0, fid):
+            coords = [[x0 + i * 0.01, 60.3] for i in range(6)]       # ~2.8 km
+            return {"type": "Feature", "id": fid, "geometry": {"type": "LineString", "coordinates": coords}}
+        site = {"lipas-id": 7, "type": {"type-code": 4405}, "name": "Kaksiosainen reitti", "status": "active",
+                "properties": {}, "location": {"geometries": {"features": [ln(24.0, "a"), ln(24.9, "b")]}}}
+        parts = normalize.lipas_site_to_features(site, clf, settings)
+        self.assertEqual([p.uid for p in parts], ["lipas-7-1", "lipas-7-2"])
+        park = {"type": "Polygon", "coordinates": [[[23.9, 60.2], [24.2, 60.2], [24.2, 60.4], [23.9, 60.4], [23.9, 60.2]]]}
+        areas_mod.assign_areas(parts, [AreaDef("puisto", "kansallispuistot", Localized("Puisto"), "puisto", park)])
+        self.assertEqual([p.areas for p in parts], [["kansallispuistot/puisto"], []])
+        self.assertIsNot(parts[0].services, parts[1].services)
+
+    def test_region_sections_get_areas_separately(self):
+        from lipas2tak import areas as areas_mod
+        from lipas2tak.model import AreaDef, Feature, Localized
+        def box(x0, x1):
+            return {"type": "Polygon", "coordinates": [[[x0, 60], [x1, 60], [x1, 61], [x0, 61], [x0, 60]]]}
+        regs = [AreaDef("a", "maakunnat", Localized("A"), "a", box(24, 25)),
+                AreaDef("b", "maakunnat", Localized("B"), "b", box(25, 26))]
+        line = [(24.1 + i * 0.02, 60.5) for i in range(85)]
+        f = Feature(uid="lipas-9", source="lipas", source_id="9", kind="retkeilyreitti",
+                    name=Localized("Pitkä reitti"), lines=[line])
+        out = areas_mod.split_routes_by_region([f], regs)
+        park = AreaDef("puisto", "kansallispuistot", Localized("Puisto"), "puisto", box(25.5, 25.9))
+        areas_mod.assign_areas(out, [park])
+        self.assertEqual([g.areas for g in out], [[], ["kansallispuistot/puisto"]])
+        self.assertEqual(f.areas, [])
+
     def test_merge_strokes_through_junction(self):
         # A cross: four arms meeting at one point become two straight lines
         c = (24.5, 60.3)
@@ -594,6 +629,93 @@ class PipelineTests(unittest.TestCase):
         out = self.tmp / "out"
         with zipfile.ZipFile(out / "fi/kansallispuistot/nuuksio/nuuksio_fi.zip") as z:
             self.assertFalse(any(n.startswith("lipas-900002/") for n in z.namelist()))
+
+
+    def test_unreadable_state_file(self):
+        self.run_once()
+        state = self.tmp / "cache" / "state.json"
+        state.write_text("", encoding="utf-8")          # e.g. container stopped mid-write
+        res = self.run_once()
+        self.assertIn("state.json unreadable: no comparison with the previous build this time", res["warnings"])
+        self.assertTrue(json.loads(state.read_text())["areas"])     # rewritten
+        self.assertNotIn("state.json unreadable", " ".join(self.run_once()["warnings"]))
+
+    def test_unexpected_record_is_skipped(self):
+        import copy
+        bad = copy.deepcopy(self.raw.lois[0])
+        bad["id"] = "bad-1"
+        bad["geometries"]["features"][0]["geometry"] = {"type": "GeometryCollection", "geometries": []}
+        multi = copy.deepcopy(self.raw.lois[0])
+        multi["id"] = "multi-1"
+        multi["geometries"]["features"][0]["geometry"] = {"type": "MultiPolygon", "coordinates": [
+            [[[24.50, 60.30], [24.51, 60.30], [24.51, 60.31], [24.50, 60.30]]]]}
+        self.raw.lois += [bad, multi]
+        self.raw.sites.append({"type": {"type-code": 4405}, "name": "Ilman tunnistetta"})   # no lipas-id
+        res = self.run_once()
+        w = res["warnings"]
+        self.assertTrue(any(x.startswith("Lipas LOI: 1 records skipped") and "bad-1" in x for x in w), w)
+        self.assertTrue(any(x.startswith("Lipas site: 1 records skipped") for x in w), w)
+        idx = res["index"]
+        uids = {u for e in idx["areas"] for u in e["uids"]}
+        self.assertIn("loi-multi-1", uids)
+        self.assertNotIn("loi-bad-1", uids)
+
+    def test_only_run_keeps_full_output_and_state(self):
+        self.run_once()
+        out, state = self.tmp / "out", self.tmp / "cache" / "state.json"
+        full_index = (out / "index.json").read_bytes()
+        full_state = state.read_bytes()
+        res = pipeline.run(self.settings, self.raw, only=["nuuksio"],
+                           now=datetime(2026, 10, 8, tzinfo=timezone.utc))
+        self.assertEqual((out / "index.json").read_bytes(), full_index)
+        self.assertEqual(state.read_bytes(), full_state)
+        part = json.loads((self.tmp / "out-only" / "index.json").read_text())
+        self.assertEqual({e["key"] for e in part["areas"]}, {"kansallispuistot/nuuksio"})
+        self.assertFalse(res["changes"])      # other areas are not reported as removed
+        # The comparison base is intact: a missing area is still noticed
+        self.raw.area_sites["kansallispuistot"] = [s for s in self.raw.area_sites["kansallispuistot"]
+                                                   if "Nuuksio" not in s["name"]]
+        self.assertIn("kansallispuistot/nuuksio: in the previous build but missing now, no package",
+                      self.run_once()["warnings"])
+
+    def test_gpx_link_with_quote(self):
+        from lipas2tak.writers import gpx
+        doc = gpx.route_gpx('Reitti "A"', "kuvaus", [[(24.5, 60.3), (24.6, 60.4)]],
+                            link='https://example.com/?q="x"&y=<1>')
+        root = ET.fromstring(doc)
+        ns = {"g": "http://www.topografix.com/GPX/1/1"}
+        self.assertEqual(root.find("g:metadata/g:link", ns).get("href"), 'https://example.com/?q="x"&y=<1>')
+
+
+class CacheFileTests(unittest.TestCase):
+    def setUp(self):
+        from lipas2tak.sources.http import CachedClient
+        self.tmp = Path(tempfile.mkdtemp())
+        self.client = CachedClient(self.tmp, delay_s=0)
+        self.url = "https://example.invalid/api"
+        self.path = self.client._key("GET", self.url, None, None)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def test_unreadable_cache_file_is_ignored(self):
+        from unittest import mock
+        self.path.write_text('{"half": ', encoding="utf-8")
+        self.assertIsNone(self.client.cached(self.url))
+        self.assertEqual(self.client.stale, [])
+        resp = mock.Mock(status_code=200, json=lambda: {"ok": 1})
+        with mock.patch.object(self.client.session, "get", return_value=resp):
+            self.assertEqual(self.client.get_json(self.url), {"ok": 1})    # fetched again
+        self.assertEqual(json.loads(self.path.read_text()), {"ok": 1})
+        self.assertEqual([p.name for p in self.tmp.iterdir()], [self.path.name])   # no temp files left
+
+    def test_unreadable_cache_file_with_failing_request(self):
+        import requests
+        from unittest import mock
+        self.path.write_text("", encoding="utf-8")
+        with mock.patch.object(self.client.session, "get", side_effect=requests.ConnectionError("down")):
+            with self.assertRaises(RuntimeError):
+                self.client.get_json(self.url, use_cache=False, retries=1, stale_ok=True)
 
 
 class ScheduleTests(unittest.TestCase):

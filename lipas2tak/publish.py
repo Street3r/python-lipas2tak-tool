@@ -134,7 +134,9 @@ def _sync_tree(src: Path, repo: Path) -> None:
         if p.is_file():
             dst = repo / p.relative_to(src)
             dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(p, dst)
+            # copyfile, not copy2: a fresh mtime lets git notice a same-size change
+            # even within the same second (core.checkstat=minimal)
+            shutil.copyfile(p, dst)
 
 
 def _changelog(old: str, now: datetime, changes: dict, n_features: int) -> str:

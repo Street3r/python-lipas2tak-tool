@@ -48,9 +48,12 @@ def fetch_regions_from_features(features: list[dict]) -> list[AreaDef]:
     for f in features:
         p = f.get("properties") or {}
         fi = p.get("nimi") or p.get("name")
-        en = p.get("name") or fi
         if not f.get("geometry"):
             continue
+        if not fi:
+            log.warning("Region without a name skipped: %s", p)
+            continue
+        en: str = p.get("name") or fi
         out.append(AreaDef(
             slug=file_slug(fi),
             category="maakunnat",

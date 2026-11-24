@@ -94,7 +94,7 @@ def next_slot(after: datetime, at: tuple[int, int, int], tz: ZoneInfo) -> dateti
 def _last_run(args) -> datetime | None:
     """Time of the previous run (output index.json), or None."""
     try:
-        idx = _settings(args).path("output") / "index.json"
+        idx = pipeline.output_dir(_settings(args), args.only) / "index.json"
         return datetime.fromisoformat(json.loads(idx.read_text(encoding="utf-8"))["generated"])
     except (OSError, ValueError, KeyError):
         return None

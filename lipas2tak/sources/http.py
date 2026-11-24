@@ -10,6 +10,8 @@ from typing import Any, Callable
 
 import requests
 
+from ..fileutil import read_json, write_json_atomic
+
 log = logging.getLogger(__name__)
 
 USER_AGENT = "python-lipas2tak-tool (+https://github.com/Street3r/python-lipas2tak-tool)"
@@ -41,13 +43,14 @@ class CachedClient:
                quiet: bool = False) -> Any:
         """Last cached response regardless of age, or None (no network request)."""
         path = self._key(method, url, params, data)
-        if not path.exists():
+        payload = read_json(path)
+        if payload is None:
             return None
         if not quiet:
             age_h = (time.time() - path.stat().st_mtime) / 3600
             log.warning("Using cached copy of %s from %.0f h ago", url, age_h)
             self.stale.append((url, age_h))
-        return json.loads(path.read_text(encoding="utf-8"))
+        return payload
 
     def get_json(self, url: str, params: Any = None, *, method: str = "GET", data: Any = None,
                  use_cache: bool = True, retries: int | None = None, timeout_s: float | None = None,
@@ -62,7 +65,9 @@ class CachedClient:
         """
         path = self._key(method, url, params, data)
         if use_cache and path.exists() and time.time() - path.stat().st_mtime < self.max_age_s:
-            return json.loads(path.read_text(encoding="utf-8"))
+            payload = read_json(path)
+            if payload is not None:   # unreadable (e.g. half-written) copies are fetched again
+                return payload
         wait = max(0.0, self.delay_s - (time.time() - self._last))
         if wait:
             time.sleep(wait)
@@ -84,7 +89,7 @@ class CachedClient:
                 payload = r.json()
                 if validate:
                     validate(payload)
-                path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+                write_json_atomic(path, payload, ensure_ascii=False)
                 return payload
             except (requests.RequestException, ValueError) as e:
                 last_err = e
@@ -97,9 +102,9 @@ class CachedClient:
                 log.warning("Request failed (%s), attempt %d/%d, retrying in %ss: %s",
                             url, attempt + 1, retries, backoff, e)
                 time.sleep(backoff)
-        if stale_ok and path.exists():
+        if stale_ok and (payload := read_json(path)) is not None:
             age_h = (time.time() - path.stat().st_mtime) / 3600
             log.warning("Request failed (%s): using cached copy from %.0f h ago", url, age_h)
             self.stale.append((url, age_h))
-            return json.loads(path.read_text(encoding="utf-8"))
+            return payload
         raise RuntimeError(f"Request failed: {url}") from last_err
